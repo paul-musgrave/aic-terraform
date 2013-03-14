@@ -1,0 +1,35 @@
+Data format
+-------------------
+Changed tiles (within vision range) as json array of
+    row col newtype
+
+
+
+visualizer issues:
+    zoom on center
+    drag
+    element dependencies / redrawing
+        layers
+
+use keyframes
+
+fog:
+can precompute mask for view radius (array of rows (giving length and optionally -offset), or boolean quarter circle using symmetric update (could extend to eighth and special case diagonals))
+    umm, this is just the problem of making a circle, surely been studied
+no need to reset layer for new viewpoints, only removing
+could also do partial removing, clearing the vision of removed tiles and only readding viewpoints within 2*viewradius
+    could keep count of observers and decrement; probably not worth it?
+    how to get the area to clear? could use the add-tile method
+also, vision could be chunkier; likely not as good
+may want to only do view updates for edge tiles in case of large blocks
+    could in general only do circle portions in direction where there isn't another view tile; pretty near optimal
+        can just check the map if already updated
+        can be used to re-add distant tiles when removing, but either only those with r < d < 2r or don't count non-selected (farther) tiles for adjacency check
+could track whole chunks of tiles (wouldn't be as applicable if nano propagates incrementally)
+
+optional feature: could have darker fog for never-been-seen
+
+does some layers library do partial redraw (e.g. for non-active-player terrain changes under fog)?
+    kinetic js would in all likelyhood if the tiles were a group of objects...
+    *! unnecessary, since using layers it's only a single image draw anyway
+        but this just moves the partial draw question to the fog layer/canvas for fog updates

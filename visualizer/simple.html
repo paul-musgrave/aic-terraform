@@ -1,0 +1,59 @@
+<html>
+<head>
+    <title>Simple Land War Visualizer</title>
+    <script type="text/javascript" src="scratch/lib/jquery-1.9.1.min.js"></script>
+    <script type="text/javascript">
+        var replayData;
+        var curTurn;
+        var TILES = [
+                        [0x008B8B], // t1
+                        [0x5E2612], // t2
+                        [0x848484], // t3
+                        [0x00CD00, 0xCD0000, 0xFFD700] // f
+                    ];
+        var TILE_W = 20, TILE_H = 20;
+        var ctx;
+
+        var turnLength;
+
+        var turnTimer;
+        $(document).ready(function(){
+            ctx = $('#canvas')[0].getContext('2d');
+            $.get("../data.json", function(data){
+                replayData = data;
+                drawMap(data.map);
+                turnTimer = setTimeout(nextTurn, turnLength);
+            });
+        });
+
+        function nextTurn(){
+            updateTiles(curTurn++);
+            turnTimer = setTimeout(nextTurn, turnLength);
+        }
+
+
+        function updateTiles(tiles) {
+            for (var i = tiles.length - 1; i >= 0; i--) {
+                drawTile(tiles[i]);
+            }
+        }
+
+        function drawMap(map){
+            for (var i = 0; i < map.length; i++) { //## right order?
+                for (var j = 0; j < map[0].length; j++) {
+                    drawTile(map[i][j]);
+                }
+            }
+        }
+
+        function drawTile(tile){
+            ctx.fillStyle = TILES[tile.type][tile.owner];
+            ctx.fillRect(tile.col*TILE_W, tile.row*TILE_H, TILE_W, TILE_H);
+        }
+
+    </script>
+</head>
+<body>
+    <canvas id="canvas" width="1000" height="800"></canvas>
+</body>
+</html>
