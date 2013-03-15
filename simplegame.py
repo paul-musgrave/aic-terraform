@@ -1,11 +1,6 @@
 import json, subprocess, argparse
 from collections import deque
 
-# Notes:
-# Tiles are somewhat annoying to handle properly; different places
-# care about different attributes, and storing properties such as nano
-# in e.g. owned tiles that won't be updated is messy.
-
 
 class Terraform(object):
     """A simple terraform engine"""
@@ -38,8 +33,6 @@ class Terraform(object):
                     viewMask[viewRad-i][viewRad-j] = True
         self.viewMask = viewMask
 
-        # currently assuming a 2d arrray; in python apparently can be a dict keyed by pairs, is this better?
-        # less convenient to load, though: can't be represented in json
         f = open(mapFile, 'r')
         self.gameMap = json.loads(f.read())
         f.close()
