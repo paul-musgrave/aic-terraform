@@ -1,24 +1,28 @@
 import json, subprocess, argparse
 
-
+# Processes a turn for bot (id), given the bot's input botInput
 def doTurn(id, botInput):
     x, y, to = botInput.split()
-    if(to == 'b'): ## blank tile, doesn't spread
-        gameMap[x][y] = {'terrain': 'b', 'owner': None}
+    if(to == 's'): ## blank tile, doesn't spread
+        gameMap[x][y] = {'terrain': 's', 'owner': None}
     else:
-        spreadNano(x, y, {'terrain': to, 'owner': id if TERRAIN[to] else None})
+        propagateNano(x, y, {'terrain': to, 'owner': id if TERRAIN[to] else None})
+
+
+# given a nanoswarm at (x, y), transforms the type it is sitting on to
+# the type given by to, and propagates instantly. (NEEDS CHANGING TO TIMESTEP MODEL)
 
 # naive implementation loops infinitely on x->x nano (shouldn't exist)
-def spreadNano(x, y, to):
+def propagateNano(x, y, to):
     prev = gameMap[x][y]
     gameMap[x][y] = to
     for i in xrange(-1,1):
         for j in xrange(-1,1):
             if(inBounds(x+i,y+j) and gameMap[x+i][x+j] == prev):
-                spreadNano(x+i, y+j, to)
+                propagateNano(x+i, y+j, to)
 
     to['x'] = x, to['y'] = y
-    if(prev['terrain'] == 'HQ'): #check HQ destruction
+    if(prev['terrain'] == 'H'): #check HQ destruction
         killBot(prev['owner'])
     if(prev['owner'] != None):
         bots[prev['owner']]['tiles'].remove(to) #@@
@@ -26,7 +30,7 @@ def spreadNano(x, y, to):
         bots[to['owner']]['tiles'].append(to)
     replay[-1].append(to)
 
-
+# self-explanatory
 def inBounds(x,y):
     return 0 <= x and x < len(gameMap) and 0 <= y and y < len(gameMap[0])
 
@@ -96,11 +100,13 @@ gameMap = mapData
 replay = []
 
 TERRAIN = {
+    # generic terrain types
     1: False,
     2: False,
     3: False,
-    'b': False,
-    'HQ': True,
+    # specialized terrain types
+    's': False, # stable (does not propagate) TODO: CHANGE TO STABLE/NON-STABLE CONSTRUCTOR FOR GENERIC TYPES
+    'H': True,
     'f': True
 } ##
 
