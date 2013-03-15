@@ -71,8 +71,8 @@ class Terraform(object):
         x, y, to, spread = bot.stdout.read().split()
         ## TODO: validate input
         owner = bot.id if Terraform.TERRAIN[to] else None
-        base = self.gameMap[x][y] if spread else None
-        tile = Tile(to, owner, base)
+        spreadTo = self.gameMap[x][y] if spread else None
+        tile = Tile(to, owner, spreadTo)
         self.gameMap[x][y] = tile
 
         if(spread):
