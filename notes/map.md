@@ -13,7 +13,10 @@ Internally, each square will have the following properties associated with it:
     gameMap[x][y] = {
         'terrain': TERRAIN,
         'owner': id OR None
+        'nano': baseType OR None
     }
+
+where `baseType` specifies the base type of the nanoswarm (see nano.md).
 
 `TERRAIN` is a set of terrain types as follows:
 
@@ -22,12 +25,11 @@ Internally, each square will have the following properties associated with it:
         2: False,
         ...
         n: False,
-        'i': False,
-        'H': True,
-        'f': True,
+        'H': True, # HQ
+        'f': True, # factory
         ...
     }
 
-where each terrain type is mapped to a boolean value indicating whether the particular terrain type can have ownership. Types `1, ..., n` will represent generic terrain types, and characters will be used for specialized squares, e.g. `'H'` = HQ, `'i'` = inert.
+where each terrain type is mapped to a boolean value indicating whether the particular terrain type can have ownership. Types `1, ..., n` will represent generic terrain types, and characters will be used for specialized squares.
 
 The conversion costs from terrain type A to terrain type B are passed to each player bot at the beginning of each game.
