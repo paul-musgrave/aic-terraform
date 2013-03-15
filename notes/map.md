@@ -4,19 +4,17 @@
 
 A map is a grid-type representation of the world. No dimension of the map will exceed 1000 squares. The internal representation of the game map is named `gameMap`, which is a 2d array. The square at `(x, y) = (2, 4)` is accessed with `gameMap[2][4]`.
 
-Each square will have a particular terrain type (see below).
+Each square has an associated Tile object (see below).
 
 ## Squares/terrain
 
-Internally, each square will have the following properties associated with it:
+Internally, map squares are represented by a Tile class with the following attributes:
 
-    gameMap[x][y] = {
-        'terrain': TERRAIN,
-        'owner': id OR None
-        'nano': baseType OR None
-    }
+    tile.terrain:  TERRAIN
+    tile.owner:    id OR None
+    tile.spreadTo: TERRAIN OR None
 
-where `baseType` specifies the base type of the nanoswarm (see nano.md).
+where `spreadTo` indicates the presense of a nanoswarm that spreads to terrain this type (see nano.md).
 
 `TERRAIN` is a set of terrain types as follows:
 
@@ -25,8 +23,8 @@ where `baseType` specifies the base type of the nanoswarm (see nano.md).
         2: False,
         ...
         n: False,
-        'H': True, # HQ
         'f': True, # factory
+        'c': True, # collector
         ...
     }
 
