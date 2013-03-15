@@ -4,9 +4,9 @@ import json, subprocess, argparse
 def doTurn(id, botInput):
     x, y, to = botInput.split()
     if(to == 's'): ## blank tile, doesn't spread
-        gameMap[x][y] = {'terrain': 's', 'owner': None}
+        gameMap[x][y] = {'terrain': 's', 'owner': None, 'nanoType': None}
     else:
-        propagateNano(x, y, {'terrain': to, 'owner': id if TERRAIN[to] else None})
+        propagateNano(x, y, {'terrain': to, 'owner': id if TERRAIN[to] else None, 'nanoType': gameMap[x][y]['terrain']})
 
 
 # given a nanoswarm at (x, y), transforms the type it is sitting on to
