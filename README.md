@@ -1,5 +1,3 @@
-Notes:
-
 
 ### Mechanics / tactics ###
 Another subtle ordering issue: to be consistent with a "earlier seeds move first" rule and
@@ -11,18 +9,18 @@ spreading? This can have significant effects.
 
 Let's consider the following situation with a few different mechanics assumptions.
 
-fa fa fa fa fa
-1  1  1* 1  1
-2  2  2  2  2
-fb fb fb fb fb
+    fa fa fa fa fa
+    1  1  1* 1  1
+    2  2  2  2  2
+    fb fb fb fb fb
 
 First, manhatten spreading and order-of-creation.
 Suppose 'a' wants to attack. If 'a' places *:1->2, then next turn @:2->fa on the same spot:
 
-fa  fa  fa  fa  fa          fa  fa  fa  fa  fa         fa  fa  fa  fa  fa        fa  fa  fa  fa  fa
-1  *2  @fa *2   1    t1->  *2  @fa  fa @fa *2   b:->  *2  @fa  fa @fa *2   t2-> @fa  fa $1   fa @fa
-2   2  *2   2   2           2   2  @fa  2   2          2   2  $1   2   2         2  $1   1  $1   2 
-fb  fb  fb  fb  fb          fb  fb  fb  fb  fb         fb  fb  fb  fb  fb        fb  fb  fb  fb  fb
+    fa  fa  fa  fa  fa          fa  fa  fa  fa  fa         fa  fa  fa  fa  fa        fa  fa  fa  fa  fa
+    1  *2  @fa *2   1    t1->  *2  @fa  fa @fa *2   b:->  *2  @fa  fa @fa *2   t2-> @fa  fa $1   fa @fa
+    2   2  *2   2   2           2   2  @fa  2   2          2   2  $1   2   2         2  $1   1  $1   2 
+    fb  fb  fb  fb  fb          fb  fb  fb  fb  fb         fb  fb  fb  fb  fb        fb  fb  fb  fb  fb
 
 This is bad for 'a', assuming 'b' does the obvious $:fa->1. 'a' can counter with a 1->2 on $, which saves his original factories but nothing else.
 (Is there a better move for 'a'?)
