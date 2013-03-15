@@ -75,7 +75,7 @@ class Terraform(object):
         tile = Tile(to, owner, spreadTo)
         self.gameMap[x][y] = tile
 
-        if(spread):
+        if int(spread):
             self.nanoQueue.append({'x': x, 'y': y, 't': tile})
 
     def propagateNano(self):
