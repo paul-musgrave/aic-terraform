@@ -2,6 +2,9 @@ import json, subprocess, argparse, math
 from itertools import islice
 from collections import deque
 
+#TODO: pass all bots owners as if they are bot 1: owner - botid % numbots + 1
+    # don't remove dead bots; add an alive attribute
+
 class Terraform(object):
     """A simple terraform engine"""
 
@@ -59,6 +62,7 @@ class Terraform(object):
         self.replay = []
 
     def run(self, botFiles):
+        self.botCount = len(botFiles)
         for i, f in enumerate(botFiles):
             self.bots[i] = Bot(i, f)
             self.bots[i].start(self.initPower)
@@ -70,7 +74,9 @@ class Terraform(object):
                 # provide each bot with their current power
                 b.stdin.write( str(b.power) + '\n' )
                 for (x,y), t in self.getBotView(b).items():
-                    b.stdin.write( "%d %d %s %d %s\n".format(x, y, t.terrain, t.owner or 0, t.spreadTo or 0) )
+                    # make all bots see themselves as player 1
+                    apparentOwner = ((t.owner - b.id) % self.botCount) + 1 if t.owner else 0
+                    b.stdin.write( "%d %d %s %d %s\n".format(x, y, t.terrain, apparentOwner, t.spreadTo or 0) )
                 b.stdin.write("go\n")
                 b.genPower()
                 self.doTurn(b)
