@@ -1,4 +1,4 @@
-import json, subprocess, argparse
+import json, subprocess, argparse, math
 from collections import deque
 
 
@@ -33,10 +33,12 @@ class Terraform(object):
                     viewMask[viewRad-i][viewRad-j] = True
         self.viewMask = viewMask
 
+        ## TODO: plaintext format
         f = open(mapFile, 'r')
-        self.gameMap = json.loads(f.read())
+        mapData = json.loads(f.read())
         f.close()
-        #TODO: parse metadata from map, e.g. nano costs
+        self.gameMap = mapData.map
+        self.nanoCosts = mapData.costs
 
         self.turnNo = 0
         self.replay = []
@@ -51,7 +53,7 @@ class Terraform(object):
             self.propagateNano()
             for b in self.bots:
                 b.stdin.write(json.dumps(self.getBotView(b)))
-                # initially only need one line of input
+                b.genPower()
                 self.doTurn(b)
             self.rmDead()
 
@@ -71,31 +73,30 @@ class Terraform(object):
     def doTurn(self, bot):
         botcmd = bot.stdout.readline()
         while (botcmd != 'go'):
-            if (bot.power <= 0):
-                return -1; # out of power
-
-            #TODO: add nano costs into map metadata
-        
             x, y, to, spread = botcmd.split()
-            botcmd = bot.stdout.readline() # read next cmd (for next loop)
+            spread = int(spread)  # booleanize
+            botcmd = bot.stdout.readline()  # read next cmd (for next loop)
 
             # validate input
-            foundOwnFactory = false
+            adjacentFactory = False
             for i in xrange(-1, 1):
                 for j in xrange(-1, 1):
-                    if (self.gameMap[x + i][y + j].terrain == 'f' and self.gameMap[x + i][y + j].owner == bot.id):
-                        foundOwnFactory = true
-            if (not foundOwnFactory):
-                return -1; # nano must be placed beside own factory!
-            
+                    if (self.inBounds(x+i,y+j) and (x+i,y+j) in bot.factories):
+                        adjacentFactory = True
 
-            owner = bot.id if Terraform.TERRAIN[to] else None
-            spreadTo = self.gameMap[x][y] if spread else None
-            tile = Tile(to, owner, spreadTo)
-            self.gameMap[x][y] = tile
+            cost = self.getCost(self.gameMap[x][y].terrain, to, spread)
+            if(adjacentFactory and bot.power >= cost):
+                bot.power -= cost
+                owner = bot.id if Terraform.TERRAIN[to] else None
+                spreadTo = self.gameMap[x][y].terrain if spread else None
+                tile = Tile(to, owner, spreadTo)
+                self.gameMap[x][y] = tile
 
-            if int(spread):
-                self.nanoQueue.append({'x': x, 'y': y, 't': tile})
+                if spread:
+                    self.nanoQueue.append({'x': x, 'y': y, 't': tile})
+            else:
+                print "Invalid move by %d: %s" % bot.id, " ".join([x,y,to,spread])
+
 
     def propagateNano(self):
         q = self.nanoQueue
@@ -152,6 +153,10 @@ class Terraform(object):
         del self.bots[bId]
         print "bot " + bId + " killed."
 
+    # Get the cost of a nanoswarm
+    def getCost(self, base, result, spreading):
+        return self.nanoCosts[base][result] * (1 if spreading else self.nanoCosts['stableFactor'])
+
 
 class Tile(object):
     """A square of the game map"""
@@ -173,6 +178,7 @@ class Bot(object):
         self.handle = handle
 
     def start(self):
+        ## doubtful about this buffer size now that we have multiple input lines
         self.io = subprocess.Popen(['python', self.handle], bufsize=1, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         self.stdin = self.io.stdin
         self.stdout = self.io.stdout
@@ -195,6 +201,9 @@ class Bot(object):
 
     def ownedTiles(self):
         return self.factories + self.collectors
+
+    def genPower(self):
+        return 10 + 3*math.log(len(self.collectors)+1, 2)
 
 
 def __main__():
