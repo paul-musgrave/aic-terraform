@@ -67,7 +67,8 @@ class Terraform(object):
             self.replay.append([])
             self.propagateNano()
             for b in self.bots:
-                # should we be providing their current power?
+                # provide each bot with their current power
+                b.stdin.write( str(b.power) + '\n' )
                 for (x,y), t in self.getBotView(b).items():
                     b.stdin.write( "%d %d %s %d %s\n".format(x, y, t.terrain, t.owner or 0, t.spreadTo or 0) )
                 b.stdin.write("go\n")
@@ -91,7 +92,7 @@ class Terraform(object):
     def doTurn(self, bot):
         botcmd = bot.stdout.readline()
         while (botcmd != 'go'):
-            x, y, to, spread = botcmd.split()
+            x, y, resType, spread = botcmd.split()
             spread = int(spread)  # booleanize
             botcmd = bot.stdout.readline()  # read next cmd (for next loop)
 
@@ -102,18 +103,18 @@ class Terraform(object):
                     if (self.inBounds(x+i,y+j) and (x+i,y+j) in bot.factories):
                         adjacentFactory = True
 
-            cost = self.getCost(self.gameMap[x][y].terrain, to, spread)
+            cost = self.getCost(self.gameMap[x][y].terrain, resType, spread)
             if(adjacentFactory and bot.power >= cost):
                 bot.power -= cost
-                owner = bot.id if Terraform.TERRAIN[to] else None
+                owner = bot.id if Terraform.TERRAIN[resType] else None
                 spreadTo = self.gameMap[x][y].terrain if spread else None
-                tile = Tile(to, owner, spreadTo)
+                tile = Tile(resType, owner, spreadTo)
                 self.gameMap[x][y] = tile
 
                 if spread:
                     self.nanoQueue.append({'x': x, 'y': y, 't': tile})
             else:
-                print "Invalid move by %d: %s" % bot.id, " ".join([x,y,to,spread])
+                print "Invalid move by %d: %s" % bot.id, " ".join([x,y,resType,spread])
 
 
     def propagateNano(self):
@@ -190,8 +191,8 @@ class Bot(object):
         self.handle = handle
 
     def start(self, initPower):
-        ## doubtful about this buffer size now that we have multiple input lines
-        self.io = subprocess.Popen(['python', self.handle], bufsize=1, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        ## we will use a fully buffered io stream (bufsize = -1)
+        self.io = subprocess.Popen(['python', self.handle], bufsize=-1, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         self.stdin = self.io.stdin
         self.stdout = self.io.stdout
 
