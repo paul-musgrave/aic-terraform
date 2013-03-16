@@ -23,15 +23,20 @@ class Terraform(object):
         self.viewRad = viewRad
         viewRad2 = viewRad*viewRad
         maskSize = 2*viewRad + 1
-        viewMask = [[False] * maskSize] * maskSize
-        for i in xrange(0, viewRad):
-            for j in xrange(0, viewRad):
+        viewMask = [[False for i in xrange(maskSize)] for j in xrange(maskSize)]
+        for i in xrange(0, viewRad+1):
+            for j in xrange(0, viewRad+1):
                 if (i*i + j*j <= viewRad2):
                     viewMask[viewRad+i][viewRad+j] = True
                     viewMask[viewRad+i][viewRad-j] = True
                     viewMask[viewRad-i][viewRad+j] = True
                     viewMask[viewRad-i][viewRad-j] = True
         self.viewMask = viewMask
+        ## Alternatively (immutable):
+        # self.viewMask = tuple(tuple((True if (viewRad-r)**2 + (viewRad-c)**2 <= viewRad2
+                                          # else False)
+                                     # for c in xrange(maskSize))
+                              # for r in xrange(maskSize))
 
         ## TODO: plaintext format
         f = open(mapFile, 'r')
