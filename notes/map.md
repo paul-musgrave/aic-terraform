@@ -30,4 +30,10 @@ where `spreadTo` indicates the presense of a nanoswarm that spreads to terrain t
 
 where each terrain type is mapped to a boolean value indicating whether the particular terrain type can have ownership. Types `1, ..., n` will represent generic terrain types, and characters will be used for specialized squares.
 
-The conversion costs from terrain type A to terrain type B are passed to each player bot at the beginning of each game.
+## Metadata
+
+The costs to build nanoswarms will be passed to the player at the beginning of each game. These costs may
+in general depend on the terrain type that the nanoswarm spreads to, and the terrain type that it converts to.
+A value `stableFactor` will also be initialized from the map metadata, which is used to determine the cost of non-spreading
+nanoswarms by `stableFactor * basecost`.
+
