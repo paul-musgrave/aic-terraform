@@ -38,12 +38,20 @@ class Terraform(object):
                                      # for c in xrange(maskSize))
                               # for r in xrange(maskSize))
 
-        ## TODO: plaintext format
+        ## TODO: MetaData in plaintext? YAML?
         f = open(mapFile, 'r')
-        mapData = json.loads(f.read())
+        # Assuming that we have some metadata at the top to distinguish the type?
+        typeLine = f.readline()
+        if 'plaintext' in typeLine:
+          self.gameMap = [map(Tile,list(line)) for line in f]
+        else if 'json' in typeLine:
+          mapData = json.loads(f.read())
+          self.gameMap = mapData.map
+          self.nanoCosts = mapData.costs # Where is this going to be in plain text?
+        else:
+          print "Error: Unknown map format."
+          self.gameMap = []
         f.close()
-        self.gameMap = mapData.map
-        self.nanoCosts = mapData.costs
 
         self.turnNo = 0
         self.replay = []
@@ -84,8 +92,8 @@ class Terraform(object):
 
             # validate input
             adjacentFactory = False
-            for i in xrange(-1, 1):
-                for j in xrange(-1, 1):
+            for i in xrange(-1, 2):
+                for j in xrange(-1, 2):
                     if (self.inBounds(x+i,y+j) and (x+i,y+j) in bot.factories):
                         adjacentFactory = True
 
@@ -107,8 +115,8 @@ class Terraform(object):
         q = self.nanoQueue
         self.nanoQueue = None
         for n in q:
-            for i in xrange(-1,1):
-                for j in xrange(-1,1):
+            for i in xrange(-1,2):
+                for j in xrange(-1,2):
                     x = n['x'] + i
                     y = n['y'] + j
                     if(self.inBounds(x,y) and self.gameMap[x][y].terrain == n['t'].spreadTo):
