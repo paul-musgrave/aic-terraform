@@ -1,4 +1,5 @@
 import json, subprocess, argparse, math
+from itertools import islice
 from collections import deque
 
 class Terraform(object):
@@ -37,13 +38,14 @@ class Terraform(object):
                 self.nanoCosts = mapData.costs # Where is this going to be in plain text?
             else:
                 raise Exception('Error: Unknown map format.')
-            
+
         # initialize view radius and mask
+        viewRad = self.viewRad
         viewRad2 = viewRad**2
         maskSize = 2*viewRad + 1
         viewMask = [[False for i in xrange(maskSize)] for j in xrange(maskSize)]
-        for i in xrange(-viewRad-1, viewRad+1):
-            for j in xrange(-viewRad-1, viewRad+1):
+        for i in xrange(-viewRad, viewRad+1):
+            for j in xrange(-viewRad, viewRad+1):
                 if (i*i + j*j <= viewRad2):
                     viewMask[viewRad+i][viewRad+j] = True
 
@@ -65,7 +67,10 @@ class Terraform(object):
             self.replay.append([])
             self.propagateNano()
             for b in self.bots:
-                b.stdin.write(json.dumps(self.getBotView(b)))
+                # should we be providing their current power?
+                for (x,y), t in self.getBotView(b).items():
+                    b.stdin.write( "%d %d %s %d %s\n".format(x, y, t.terrain, t.owner or 0, t.spreadTo or 0) )
+                b.stdin.write("go\n")
                 b.genPower()
                 self.doTurn(b)
             self.rmDead()
@@ -92,8 +97,8 @@ class Terraform(object):
 
             # validate input
             adjacentFactory = False
-            for i in xrange(-1, 1):
-                for j in xrange(-1, 1):
+            for i in xrange(-1, 2):
+                for j in xrange(-1, 2):
                     if (self.inBounds(x+i,y+j) and (x+i,y+j) in bot.factories):
                         adjacentFactory = True
 
@@ -115,8 +120,8 @@ class Terraform(object):
         q = self.nanoQueue
         self.nanoQueue = None
         for n in q:
-            for i in xrange(-1, 1):
-                for j in xrange(-1, 1):
+            for i in xrange(-1, 2):
+                for j in xrange(-1, 2):
                     x = n['x'] + i
                     y = n['y'] + j
                     if(self.inBounds(x,y) and self.gameMap[x][y].terrain == n['t'].spreadTo):
@@ -139,22 +144,17 @@ class Terraform(object):
 
     #assuming non wrapping map
     def getBotView(self, b):
-        visible = [[False] * len(self.gameMap[0])] * len(self.gameMap)  # map, init to False
+        view = {}
         for (xt,yt) in b.ownedTiles():
-            x0 = xt - self.viewRad
-            y = y0 = yt - self.viewRad
-            for i in xrange(0, len(self.viewMask)):
-                x0 += 1
-                if(not self.inBounds(x0)):
+            for i,x in enumerate(xt-self.viewRad, xt+self.viewRad+1):
+                if not self.inBounds(x,0):
                     continue
-                for j in xrange(0, self.maskSize):
-                    y += 1
-                    if(not self.inBounds(y)):
+                for j,y in enumerate(yt-self.viewRad, yt+self.viewRad+1):
+                    if not self.inBounds(0,y):
                         continue
                     if self.viewMask[i][j]:
-                        visible[x0][y] = True
-                y = y0
-        return visible
+                        view[(x,y)] = self.gameMap[x][y]
+        return view
 
     def rmDead(self):
         for b in self.bots:
