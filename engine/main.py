@@ -92,8 +92,8 @@ class Terraform(object):
 
             # validate input
             adjacentFactory = False
-            for i in xrange(-1, 2): ### ?? adjacency test fail?
-                for j in xrange(-1, 2): ### ?? adjacency test fail?
+            for i in xrange(-1, 1):
+                for j in xrange(-1, 1):
                     if (self.inBounds(x+i,y+j) and (x+i,y+j) in bot.factories):
                         adjacentFactory = True
 
@@ -115,8 +115,8 @@ class Terraform(object):
         q = self.nanoQueue
         self.nanoQueue = None
         for n in q:
-            for i in xrange(-1,2): ### ?? adjacency test fail?
-                for j in xrange(-1,2): ### ?? adjacency test fail?
+            for i in xrange(-1, 1):
+                for j in xrange(-1, 1):
                     x = n['x'] + i
                     y = n['y'] + j
                     if(self.inBounds(x,y) and self.gameMap[x][y].terrain == n['t'].spreadTo):
