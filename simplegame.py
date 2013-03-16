@@ -36,6 +36,7 @@ class Terraform(object):
         f = open(mapFile, 'r')
         self.gameMap = json.loads(f.read())
         f.close()
+        #TODO: parse metadata from map, e.g. nano costs
 
         self.turnNo = 0
         self.replay = []
@@ -68,15 +69,33 @@ class Terraform(object):
             print b.id
 
     def doTurn(self, bot):
-        x, y, to, spread = bot.stdout.read().split()
-        ## TODO: validate input
-        owner = bot.id if Terraform.TERRAIN[to] else None
-        spreadTo = self.gameMap[x][y] if spread else None
-        tile = Tile(to, owner, spreadTo)
-        self.gameMap[x][y] = tile
+        botcmd = bot.stdout.readline()
+        while (botcmd != 'go'):
+            if (bot.power <= 0):
+                return -1; # out of power
 
-        if int(spread):
-            self.nanoQueue.append({'x': x, 'y': y, 't': tile})
+            #TODO: add nano costs into map metadata
+        
+            x, y, to, spread = botcmd.split()
+            botcmd = bot.stdout.readline() # read next cmd (for next loop)
+
+            # validate input
+            foundOwnFactory = false
+            for i in xrange(-1, 1):
+                for j in xrange(-1, 1):
+                    if (self.gameMap[x + i][y + j].terrain == 'f' and self.gameMap[x + i][y + j].owner == bot.id):
+                        foundOwnFactory = true
+            if (not foundOwnFactory):
+                return -1; # nano must be placed beside own factory!
+            
+
+            owner = bot.id if Terraform.TERRAIN[to] else None
+            spreadTo = self.gameMap[x][y] if spread else None
+            tile = Tile(to, owner, spreadTo)
+            self.gameMap[x][y] = tile
+
+            if int(spread):
+                self.nanoQueue.append({'x': x, 'y': y, 't': tile})
 
     def propagateNano(self):
         q = self.nanoQueue
@@ -150,6 +169,7 @@ class Bot(object):
         self.id = bId
         self.factories = []
         self.collectors = []
+        self.power = 100
         self.handle = handle
 
     def start(self):
