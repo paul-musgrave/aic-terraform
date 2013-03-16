@@ -3,6 +3,8 @@ from collections import deque
 
 class Terraform(object):
     """A simple terraform engine"""
+
+    ## TODO: move this and other global constants to constants file
     TERRAIN = {
         # generic terrain types
         1: False,
@@ -19,13 +21,13 @@ class Terraform(object):
         self.bots = {}
 
         with open(mapFile, 'w') as f:
-            # read map type
-            mapFormat = f.readline()
+            mapFormat = f.readline() # read map type
             if 'plain' in mapFormat:
                 # read first line of metadata
                 self.terrainTypes, self.initPower, self.maxTurnss, self.viewRad = [int(x) for x in f.readline().split()]
                 # read nano costs matrix
                 self.nanoCosts = [[int(x) for x in line.split()] for line in list(islice(f, self.terrainTypes + 2))]
+                self.nanoCosts['stableFactor'] = int(f.readline())
                 # read map
                 self.gameMap = [map(Tile,list(line)) for line in f]
             elif 'json' in mapFormat:
@@ -34,20 +36,17 @@ class Terraform(object):
                 self.gameMap = mapData.map
                 self.nanoCosts = mapData.costs # Where is this going to be in plain text?
             else:
-                print "Error: Unknown map format."
-                self.gameMap = []
+                raise Exception('Error: Unknown map format.')
             
         # initialize view radius and mask
-        viewRad2 = viewRad*viewRad
+        viewRad2 = viewRad**2
         maskSize = 2*viewRad + 1
         viewMask = [[False for i in xrange(maskSize)] for j in xrange(maskSize)]
-        for i in xrange(0, viewRad+1):
-            for j in xrange(0, viewRad+1):
+        for i in xrange(-viewRad-1, viewRad+1):
+            for j in xrange(-viewRad-1, viewRad+1):
                 if (i*i + j*j <= viewRad2):
                     viewMask[viewRad+i][viewRad+j] = True
-                    viewMask[viewRad+i][viewRad-j] = True
-                    viewMask[viewRad-i][viewRad+j] = True
-                    viewMask[viewRad-i][viewRad-j] = True
+
         self.viewMask = viewMask
         ## Alternatively (immutable):
         # self.viewMask = tuple(tuple((True if (viewRad-r)**2 + (viewRad-c)**2 <= viewRad2
@@ -93,8 +92,8 @@ class Terraform(object):
 
             # validate input
             adjacentFactory = False
-            for i in xrange(-1, 2):
-                for j in xrange(-1, 2):
+            for i in xrange(-1, 2): ### ?? adjacency test fail?
+                for j in xrange(-1, 2): ### ?? adjacency test fail?
                     if (self.inBounds(x+i,y+j) and (x+i,y+j) in bot.factories):
                         adjacentFactory = True
 
@@ -116,8 +115,8 @@ class Terraform(object):
         q = self.nanoQueue
         self.nanoQueue = None
         for n in q:
-            for i in xrange(-1,2):
-                for j in xrange(-1,2):
+            for i in xrange(-1,2): ### ?? adjacency test fail?
+                for j in xrange(-1,2): ### ?? adjacency test fail?
                     x = n['x'] + i
                     y = n['y'] + j
                     if(self.inBounds(x,y) and self.gameMap[x][y].terrain == n['t'].spreadTo):

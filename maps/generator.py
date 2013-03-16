@@ -17,6 +17,7 @@ nanoCosts = [[00, 10, 10, 10, 10, 50, 30], #turn terrain 1 into terrain n
              [10, 10, 10, 10, 00, 50, 30],
              [05, 05, 05, 05, 05, 00, 10],
              [05, 05, 05, 05, 05, 30, 00]]
+stableFactor = 1
 
 if len(nanoCosts) != terrainTypes + 2:
     raise Exception('nanoCosts matrix has incorrect dimension')
@@ -49,11 +50,12 @@ def genRndMap(outputFile):
 with open('-'.join([str(args.t), str(args.w), str(args.h), str(terrainTypes)]) + '.map', 'w') as outputFile:
     outputFile.write('plain\n')
     outputFile.write(' '.join([str(terrainTypes), str(initPower), str(maxTurns), str(viewRad)]) + '\n')
+    
     for row in nanoCosts:
         for entry in row:
             outputFile.write(str(entry) + ' ')
         outputFile.write('\n')
-    outputFile.write('\n')
+    outputFile.write(str(stableFactor) + '\n')
     
     # pick generator!
     if args.t == 'rnd':
