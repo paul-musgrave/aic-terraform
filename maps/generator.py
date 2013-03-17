@@ -40,6 +40,11 @@ def genRndMap(outputFile):
     # place initial factories at random locations
     mapData[0][0] = mapData[args.w - 1][args.h - 1] = 'f'
 
+    # assign factory owners
+    outputFile.write("2\n")  # number of factories
+    outputFile.write("%d %d 1\n" % (0, 0))  # x y owner
+    outputFile.write("%d %d 2\n" % (args.w-1, args.h-1))
+
     # write output file
     for row in mapData:
         for tile in row:
@@ -50,13 +55,13 @@ def genRndMap(outputFile):
 with open('-'.join([str(args.t), str(args.w), str(args.h), str(terrainTypes)]) + '.map', 'w') as outputFile:
     outputFile.write('plain\n')
     outputFile.write(' '.join([str(terrainTypes), str(initPower), str(maxTurns), str(viewRad)]) + '\n')
-    
+
     for row in nanoCosts:
         for entry in row:
             outputFile.write(str(entry) + ' ')
         outputFile.write('\n')
     outputFile.write(str(stableFactor) + '\n')
-    
+
     # pick generator!
     if args.t == 'rnd':
         genRndMap(outputFile)

@@ -11,22 +11,28 @@ class TestBot(object):
             try:
                 #turn start
                 self.factories = []
-                self.power = float(sys.stdin.readline())
+                ## DEBUG
+                l = sys.stdin.readline()
+                print >> sys.stderr, "l: " + l
+                self.power = float(l)
                 line = sys.stdin.readline()
                 while(not 'go' in line):
                     x, y, terrain, owner, spreadTo = line.split()
                     if terrain == 'f' and int(owner) == 1:
-                        self.factories.append( (x,y) )
+                        self.factories.append( (int(x),int(y)) )
                     line = sys.stdin.readline()
                 self.doTurn()
+                sys.stdout.flush()
+                print >> sys.stderr, "did turn"
             except EOFError:
                 break
 
     def doTurn(self):
         (x,y) = self.factories[0]
         if self.power > 50:
-            print x, y+1, 'f', '1'
+            print x, (y+1), 'f', '1'
+        print 'go'
 
-def __main__():
+if __name__ == "__main__":
     b = TestBot()
     b.run()

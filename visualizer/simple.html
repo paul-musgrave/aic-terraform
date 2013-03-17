@@ -47,8 +47,8 @@
         }
 
         function drawTile(tile){
-            ctx.fillStyle = TILES[tile.type][tile.owner];
-            ctx.fillRect(tile.col*TILE_W, tile.row*TILE_H, TILE_W, TILE_H);
+            ctx.fillStyle = TILES[tile.t.terrain][tile.t.owner];
+            ctx.fillRect(tile.x*TILE_W, tile.y*TILE_H, TILE_W, TILE_H); //## backwards x y?
         }
 
     </script>
