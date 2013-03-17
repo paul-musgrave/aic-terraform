@@ -81,13 +81,11 @@ class Terraform(object):
             self.propagateNano()
             for b in self.bots.values():
                 # provide each bot with their current power
-                print 't' ##DEBUG
                 b.stdin.write( str(b.power) + '\n' )
                 for (x,y), t in self.getBotView(b).items():
-                    print 'x' ##DEBUG
                     # make all bots see themselves as player 1
                     apparentOwner = ((t.owner - b.id) % len(self.players)) + 1 if t.owner else 0
-                    print "%d %d %s %d %s\n" % (x, y, t.terrain, apparentOwner, t.spreadTo or 0) ## DEBUG
+                    #print "%d %d %s %d %s\n" % (x, y, t.terrain, apparentOwner, t.spreadTo or 0) ## DEBUG
                     b.stdin.write( "%d %d %s %d %s\n" % (x, y, t.terrain, apparentOwner, t.spreadTo or 0) )
                 b.stdin.write("go\n")
                 b.stdin.flush()
@@ -139,11 +137,11 @@ class Terraform(object):
                 spreadTo = self.gameMap[x][y].terrain if spread else None
                 tile = Tile(resType, owner, spreadTo)
                 self.gameMap[x][y] = tile
+                self.replay[-1].append({'x': x, 'y': y, 't': tile.json()})
 
                 if spread:
-                    self.nanoQueue.append({'x': x, 'y': y, 't': tile})
+                    self.nanoQueue.append( (x,y) )
             except GameError as e:
-                print botcmd
                 print "Invalid move by bot", bot.id, ":", botcmd,
                 print "Reason:", e
             except ValueError:
@@ -155,26 +153,27 @@ class Terraform(object):
 
     def propagateNano(self):
         q = self.nanoQueue
-        self.nanoQueue = []
-        for n in q:
+        self.nanoQueue = deque()
+        for (nx,ny) in q:
+            nt = self.gameMap[nx][ny]
             for i in xrange(-1, 2):
+                x = nx + i
                 for j in xrange(-1, 2):
-                    x = n['x'] + i
-                    y = n['y'] + j
-                    if(self.inBounds(x,y) and self.gameMap[x][y].terrain == n['t'].spreadTo):
+                    y = ny + j
+                    if(self.inBounds(x,y) and self.gameMap[x][y].terrain == nt.spreadTo):
                         prev = self.gameMap[x][y]
                         #update owning bots
                         if(prev.owner != None):
                             self.bots[prev.owner].remTer(x, y, prev.terrain)
-                        if(n['t'].owner != None):
-                            self.bots[n['t'].owner].addTer(x, y, n['t'].terrain)
+                        if(nt.owner != None):
+                            self.bots[nt.owner].addTer(x, y, nt.terrain)
                         #update map and nanoQueue
-                        self.gameMap[x][y] = n['t']
-                        self.nanoQueue.append({'x': x, 'y': y, 't': n['t']})
-                        self.replay[-1].append({'x': x, 'y': y, 't': n['t'].json()})
-                        #remove old nano
-                        self.gameMap[n['x']][n['y']].spreadTo = None
-                        self.replay[-1].append({'x': x, 'y': y, 't': self.gameMap[n['x']][n['y']].json()})
+                        self.gameMap[x][y] = nt.copy()
+                        self.nanoQueue.append( (x,y) )
+                        self.replay[-1].append({'x': x, 'y': y, 't': nt.json()})
+            #remove old nano
+            nt.spreadTo = None
+            self.replay[-1].append({'x': x, 'y': y, 't': nt.json()})
 
     def inBounds(self, x,y):
         return 0 <= x and x < len(self.gameMap) and 0 <= y and y < len(self.gameMap[0])
@@ -221,6 +220,9 @@ class Tile(object):
 
     def json(self):
         return { "terrain": self.terrain, "owner": self.owner, "spreadTo": self.spreadTo }
+
+    def copy(self):
+        return Tile(self.terrain, self.owner, self.spreadTo)
 
 
 class Bot(object):
