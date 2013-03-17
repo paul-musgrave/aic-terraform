@@ -21,7 +21,7 @@ class Terraform(object):
         super(Terraform, self).__init__()
         self.nanoQueue = deque()
         self.bots = {}
-
+        self.replay = { 'turns':[] }
         with open(mapFile, 'r') as f:
             mapFormat = f.readline() # read map type
             if 'plain' in mapFormat:
@@ -43,6 +43,7 @@ class Terraform(object):
                         self.players[f[2]].append( (f[0],f[1]) )
                     else:
                         self.players[f[2]] = [(f[0],f[1])]
+                self.replay['map'] = [[t.json() for t in x] for x in self.gameMap]
             elif 'json' in mapFormat:
                 ## TODO: Metadata in JSON?
                 mapData = json.loads(f.read())
@@ -68,7 +69,6 @@ class Terraform(object):
                                      # for c in xrange(maskSize))
                               # for r in xrange(maskSize))
         self.turnNo = 0
-        self.replay = []
 
     def run(self, botFiles):
         for i, f in enumerate(botFiles):
@@ -77,7 +77,7 @@ class Terraform(object):
 
         while self.turnNo < self.maxTurns and len(self.bots) >= 1:
             print "Turn", self.turnNo
-            self.replay.append([])
+            self.replay['turns'].append([])
             self.propagateNano()
             for b in self.bots.values():
                 # provide each bot with their current power
@@ -99,7 +99,7 @@ class Terraform(object):
 
         # could just write directly; would want to for streaming
         # buffered writer otherwise
-        f = open('replay', 'w')
+        f = open('replay.json', 'w')
         f.write(json.dumps(self.replay))
         f.close()
 
@@ -137,7 +137,7 @@ class Terraform(object):
                 spreadTo = self.gameMap[x][y].terrain if spread else None
                 tile = Tile(resType, owner, spreadTo)
                 self.gameMap[x][y] = tile
-                self.replay[-1].append({'x': x, 'y': y, 't': tile.json()})
+                self.replay['turns'][-1].append({'x': x, 'y': y, 't': tile.json()})
 
                 if spread:
                     self.nanoQueue.append( (x,y) )
@@ -170,10 +170,10 @@ class Terraform(object):
                         #update map and nanoQueue
                         self.gameMap[x][y] = nt.copy()
                         self.nanoQueue.append( (x,y) )
-                        self.replay[-1].append({'x': x, 'y': y, 't': nt.json()})
+                        self.replay['turns'][-1].append({'x': x, 'y': y, 't': nt.json()})
             #remove old nano
             nt.spreadTo = None
-            self.replay[-1].append({'x': x, 'y': y, 't': nt.json()})
+            self.replay['turns'][-1].append({'x': x, 'y': y, 't': nt.json()})
 
     def inBounds(self, x,y):
         return 0 <= x and x < len(self.gameMap) and 0 <= y and y < len(self.gameMap[0])
@@ -219,7 +219,7 @@ class Tile(object):
         self.spreadTo = spreadTo
 
     def json(self):
-        return { "terrain": self.terrain, "owner": self.owner, "spreadTo": self.spreadTo }
+        return { "t": self.terrain, "o": self.owner, "s": self.spreadTo }
 
     def copy(self):
         return Tile(self.terrain, self.owner, self.spreadTo)
