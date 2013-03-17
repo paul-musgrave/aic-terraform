@@ -1,4 +1,4 @@
-import sys
+import sys, random
 
 class TestBot(object):
     """Simple player to test the engine"""
@@ -24,9 +24,11 @@ class TestBot(object):
                 break
 
     def doTurn(self):
-        (x,y) = self.factories[0]
-        if self.power > 50 and not (x,y-1) in self.factories:
-            print x, (y-1), 'f', '1'
+        (x,y) = random.choice(self.factories)
+        x += random.randint(-1,1)
+        y += random.randint(-1,1)
+        if self.power > 50 and not (x,y) in self.factories:
+            print x, y, 'f', '1'
         print 'go'
 
 if __name__ == "__main__":

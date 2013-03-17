@@ -110,6 +110,7 @@ class Terraform(object):
     def doTurn(self, bot):
         botcmd = bot.stdout.readline()
         while (not 'go' in botcmd):
+            print "Bot", bot.id, ":", botcmd ## DEBUG
             try:
                 x, y, resType, spread = botcmd.split()
                 x = int(x)
