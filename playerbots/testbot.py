@@ -29,6 +29,8 @@ class TestBot(object):
         y += random.randint(-1,1)
         if self.power > 50 and not (x,y) in self.factories:
             print x, y, 'f', '1'
+        #print >> sys.stderr, self.factories ## DEBUG
+        #print >> sys.stderr, x, y ## DEBUG
         print 'go'
 
 if __name__ == "__main__":

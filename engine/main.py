@@ -110,7 +110,7 @@ class Terraform(object):
     def doTurn(self, bot):
         botcmd = bot.stdout.readline()
         while (not 'go' in botcmd):
-            print "Bot", bot.id, ":", botcmd ## DEBUG
+            print "Bot", bot.id, ":", botcmd, ## DEBUG
             try:
                 x, y, resType, spread = botcmd.split()
                 x = int(x)
@@ -174,7 +174,7 @@ class Terraform(object):
                         self.replay['turns'][-1].append({'x': x, 'y': y, 't': nt.json()})
             #remove old nano
             nt.spreadTo = None
-            self.replay['turns'][-1].append({'x': x, 'y': y, 't': nt.json()})
+            self.replay['turns'][-1].append({'x': nx, 'y': ny, 't': nt.json()})
 
     def inBounds(self, x,y):
         return 0 <= x and x < len(self.gameMap) and 0 <= y and y < len(self.gameMap[0])
@@ -263,7 +263,7 @@ class Bot(object):
         return self.factories + self.collectors
 
     def genPower(self):
-        return 10 + 3*math.log(len(self.collectors)+1, 2)
+        self.power += 10 + 3*math.log(len(self.collectors)+1, 2)
 
 
 class GameError(Exception):
