@@ -1,6 +1,6 @@
 import json, subprocess, argparse, math
 from itertools import islice
-from collections import deque
+from collections import OrderedDict
 
 
 class Terraform(object):
@@ -19,7 +19,7 @@ class Terraform(object):
 
     def __init__(self, mapFile):
         super(Terraform, self).__init__()
-        self.nanoQueue = deque()
+        self.nanoQueue = OrderedDict()
         self.bots = {}
         self.replay = { 'turns':[] }
         with open(mapFile, 'r') as f:
@@ -75,27 +75,32 @@ class Terraform(object):
             self.bots[i+1] = Bot(i+1, f, self.players[i+1])
             self.bots[i+1].start(self.initPower)
 
-        while self.turnNo < self.maxTurns and len(self.bots) >= 1:
+        while self.turnNo < self.maxTurns and len([b for b in self.bots if b.alive]) > 1:
             print "Turn", self.turnNo
             self.replay['turns'].append([])
             self.propagateNano()
-            for b in self.bots.values():
-                # provide each bot with their current power
-                b.stdin.write( str(b.power) + '\n' )
-                for (x,y), t in self.getBotView(b).items():
-                    # make all bots see themselves as player 1
-                    apparentOwner = ((t.owner - b.id) % len(self.players)) + 1 if t.owner else 0
-                    #print "%d %d %s %d %s\n" % (x, y, t.terrain, apparentOwner, t.spreadTo or 0) ## DEBUG
-                    b.stdin.write( "%d %d %s %d %s\n" % (x, y, t.terrain, apparentOwner, t.spreadTo or 0) )
-                b.stdin.write("go\n")
-                b.stdin.flush()
-                b.genPower()
-                self.doTurn(b)
             self.rmDead()
+            for b in self.bots.values():
+                if b.alive:
+                    # provide each bot with their current power
+                    b.stdin.write( str(b.power) + '\n' )
+                    for (x,y), t in self.getBotView(b).items():
+                        # make all bots see themselves as player 1
+                        apparentOwner = ((t.owner - b.id) % len(self.players)) + 1 if t.owner else 0
+                        #print "%d %d %s %d %s\n" % (x, y, t.terrain, apparentOwner, t.spreadTo or 0) ## DEBUG
+                        b.stdin.write( "%d %d %s %d %s\n" % (x, y, t.terrain, apparentOwner, t.spreadTo or 0) )
+                    b.stdin.write("go\n")
+                    b.stdin.flush()
+                    b.genPower()
+                    self.doTurn(b)
+                    self.rmDead()
             self.turnNo += 1
 
+        print "Surviving bots:"
         for b in self.bots.values():
-            b.stop()
+            if b.alive:
+                print b.id
+                b.stop()
 
         # could just write directly; would want to for streaming
         # buffered writer otherwise
@@ -103,14 +108,11 @@ class Terraform(object):
         f.write(json.dumps(self.replay))
         f.close()
 
-        print "Surviving bots:"
-        for b in self.bots.values():
-            print b.id
 
     def doTurn(self, bot):
         botcmd = bot.stdout.readline()
         while (not 'go' in botcmd):
-            print "Bot", bot.id, ":", botcmd, ## DEBUG
+            print "Bot", bot.id, ":", botcmd,
             try:
                 x, y, resType, spread = botcmd.split()
                 x = int(x)
@@ -119,7 +121,7 @@ class Terraform(object):
 
                 # validate input
                 if not self.inBounds(x,y):
-                    raise GameError("Nano placement outside of map.")
+                    raise GameError("outside of map.")
 
                 adjacentFactory = False
                 for i in xrange(-1, 2):
@@ -127,34 +129,32 @@ class Terraform(object):
                         if (self.inBounds(x+i,y+j) and (x+i,y+j) in bot.factories):
                             adjacentFactory = True
                 if not adjacentFactory:
-                    raise GameError("No adjacent factory.")
+                    raise GameError("no adjacent factory.")
 
                 cost = self.getCost(self.gameMap[x][y].terrain, resType, spread)
                 if bot.power < cost:
-                    raise GameError("Not enough power.")
+                    raise GameError("not enough power.")
 
                 bot.power -= cost
                 owner = bot.id if Terraform.TERRAIN[resType] else None
                 spreadTo = self.gameMap[x][y].terrain if spread else None
-                tile = Tile(resType, owner, spreadTo)
-                self.gameMap[x][y] = tile
-                self.replay['turns'][-1].append({'x': x, 'y': y, 't': tile.json()})
+                self.setTile(x, y, Tile(resType, owner, spreadTo))
 
                 if spread:
-                    self.nanoQueue.append( (x,y) )
+                    self.nanoQueue.pop((x,y), None)  # delete if exists
+                    self.nanoQueue[(x,y)] = True  # unused value
             except GameError as e:
-                print "Invalid move by bot", bot.id, ":", botcmd,
-                print "Reason:", e
+                print "Invalid move:", e
             except ValueError:
-                print "Invalid move by bot", bot.id, ":", botcmd,
-                print "Reason: bad command format."
+                print "Invalid move: bad command format."
 
             botcmd = bot.stdout.readline()  # read next cmd (for next loop)
 
 
     def propagateNano(self):
         q = self.nanoQueue
-        self.nanoQueue = deque()
+        self.nanoQueue = OrderedDict()
+        print q ## DEBUG
         for (nx,ny) in q:
             nt = self.gameMap[nx][ny]
             for i in xrange(-1, 2):
@@ -162,19 +162,21 @@ class Terraform(object):
                 for j in xrange(-1, 2):
                     y = ny + j
                     if(self.inBounds(x,y) and self.gameMap[x][y].terrain == nt.spreadTo):
-                        prev = self.gameMap[x][y]
-                        #update owning bots
-                        if(prev.owner != None):
-                            self.bots[prev.owner].remTer(x, y, prev.terrain)
-                        if(nt.owner != None):
-                            self.bots[nt.owner].addTer(x, y, nt.terrain)
-                        #update map and nanoQueue
-                        self.gameMap[x][y] = nt.copy()
-                        self.nanoQueue.append( (x,y) )
-                        self.replay['turns'][-1].append({'x': x, 'y': y, 't': nt.json()})
+                        self.setTile(x,y,nt.copy())
+                        self.nanoQueue.pop((x,y), None)
+                        self.nanoQueue[(x,y)] = True
             #remove old nano
             nt.spreadTo = None
             self.replay['turns'][-1].append({'x': nx, 'y': ny, 't': nt.json()})
+
+    def setTile(self, x, y, tile):
+        prev = self.gameMap[x][y]
+        self.gameMap[x][y] = tile
+        if(prev.owner != None and self.bots[prev.owner].alive):
+            self.bots[prev.owner].remTer(x, y, prev.terrain)
+        if(tile.owner in self.bots and self.bots[tile.owner].alive):
+            self.bots[tile.owner].addTer(x, y, tile.terrain)
+        self.replay['turns'][-1].append({'x': x, 'y': y, 't': tile.json()})
 
     def inBounds(self, x,y):
         return 0 <= x and x < len(self.gameMap) and 0 <= y and y < len(self.gameMap[0])
@@ -195,13 +197,9 @@ class Terraform(object):
 
     def rmDead(self):
         for b in self.bots.values():
-            if len(b.factories) == 0:
-                self.killBot(b)
-
-    def killBot(self, b):
-        self.bots[b.id].stop()
-        del self.bots[b.id]
-        print "bot " + b.id + " killed."
+            if len(b.factories) == 0 and b.alive:
+                b.stop()
+                print "bot ", b.id, " killed."
 
     # Get the cost of a nanoswarm
     def getCost(self, base, result, spreading):
@@ -214,7 +212,6 @@ class Terraform(object):
 class Tile(object):
     """A square of the game map"""
     def __init__(self, terrain, owner=None, spreadTo=None):
-        super(Tile, self).__init__()
         self.terrain = terrain
         self.owner = owner
         self.spreadTo = spreadTo
@@ -234,6 +231,7 @@ class Bot(object):
         self.factories = initFactories
         self.collectors = []
         self.handle = handle
+        self.alive = False
 
     def start(self, initPower):
         ## we will use a fully buffered io stream (bufsize = -1)
@@ -242,9 +240,11 @@ class Bot(object):
         self.stdout = self.io.stdout
 
         self.power = initPower
+        self.alive = True
 
     def stop(self):
         self.io.terminate()
+        self.alive = False
 
     # these are almost, but not quite, easy to do functionally in python
     def addTer(self, x, y, ter):
