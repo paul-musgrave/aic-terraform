@@ -1,0 +1,67 @@
+<html>
+<head>
+    <title>Simple Land War Visualizer</title>
+    <script type="text/javascript" src="scratch/lib/jquery-1.9.1.min.js"></script>
+    <script type="text/javascript" src="data.js"></script>
+    <script type="text/javascript">
+        //var replayData;
+        var curTurn = 0;
+        var TILES = {
+                        '1':["#2FBD2F"], // t1
+                        '2':["#2F39BD"], // t2
+                        '3':["#8C6C15"], // t3
+                        '4':["#736D5C"], // t3
+                        '5':["#6E3034"], // t3
+                        'c':["#00FBFF", "#A820A6", "#FFB300"],
+                        'f':["#00FBFF", "#FF00FF", "#FFFF00"]
+                    };
+        var TILE_W = 10, TILE_H = 10;
+        var ctx;
+
+        var turnLength = 100;
+
+        var turnTimer;
+        $(document).ready(function(){
+            ctx = $('#canvas')[0].getContext('2d');
+            //$.get("../replay.json", function(data){
+            //    replayData = data;
+                drawMap(window.replayData.map);
+                turnTimer = setTimeout(nextTurn, turnLength);
+            //});
+        });
+
+        function nextTurn(){
+            updateTiles(window.replayData.turns[curTurn++]);
+            turnTimer = setTimeout(nextTurn, turnLength);
+        }
+
+
+        function updateTiles(tiles) {
+            for (var i = tiles.length - 1; i >= 0; i--) {
+                drawTile(tiles[i]);
+            }
+        }
+
+        function drawMap(map){
+            for (var i = 0; i < map.length; i++) { //## right order?
+                for (var j = 0; j < map[0].length; j++) {
+                    drawTile({x:i, y:j, t:map[i][j]});
+                }
+            }
+        }
+
+        function drawTile(tile){
+            ctx.fillStyle = TILES[tile.t.t][tile.t.o || 0];
+            ctx.fillRect(tile.x*TILE_W, tile.y*TILE_H, TILE_W, TILE_H); //## backwards x y?
+            if(tile.t.s){
+                ctx.fillStyle = TILES[tile.t.s][tile.t.o || 0];
+                ctx.fillRect(tile.x*TILE_W+TILE_W/3, tile.y*TILE_H+TILE_H/3, TILE_W/3, TILE_H/3);
+            }
+        }
+
+    </script>
+</head>
+<body>
+    <canvas id="canvas" width="1000" height="1000"></canvas>
+</body>
+</html>
