@@ -75,7 +75,7 @@ class Terraform(object):
             self.bots[i+1] = Bot(i+1, f, self.players[i+1])
             self.bots[i+1].start(self.initPower)
 
-        while self.turnNo < self.maxTurns and len([b for b in self.bots if b.alive]) > 1:
+        while self.turnNo < self.maxTurns and len([b for b in self.bots.values() if b.alive]) > 1:
             print "Turn", self.turnNo
             self.replay['turns'].append([])
             self.propagateNano()
