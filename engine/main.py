@@ -17,6 +17,16 @@ class Terraform(object):
         'c': True
     }
 
+    # counterclockwise from east
+    DIRS = [ (1,0),
+             (1,-1),
+             (0,-1),
+             (-1,-1),
+             (-1,0),
+             (-1,1),
+             (0,1),
+             (1,1) ]
+
     def __init__(self, mapFile):
         super(Terraform, self).__init__()
         self.nanoQueue = OrderedDict()
@@ -35,39 +45,30 @@ class Terraform(object):
                 factories = [[int(x) for x in line.split()] for line in list(islice(f, nFact))]
                 # read map
                 self.gameMap = [map(Tile,list(line.rstrip())) for line in f]
-                # assign factories
-                self.players = {}  # used to put initial factories in bot.factories once they exist... a bit ugly
-                for f in factories:
-                    self.gameMap[f[0]][f[1]].owner = f[2]
-                    if(f[2] in self.players):
-                        self.players[f[2]].append( (f[0],f[1]) )
-                    else:
-                        self.players[f[2]] = [(f[0],f[1])]
-                self.replay['map'] = [[t.json() for t in x] for x in self.gameMap]
-            elif 'json' in mapFormat:
-                ## TODO: Metadata in JSON?
-                mapData = json.loads(f.read())
-                self.gameMap = mapData.map
-                self.nanoCosts = mapData.costs # Where is this going to be in plain text?
             else:
                 raise Exception('Error: Unknown map format.')
 
-        # initialize view radius and mask
-        viewRad = self.viewRad
-        viewRad2 = viewRad**2
-        maskSize = 2*viewRad + 1
-        viewMask = [[False for i in xrange(maskSize)] for j in xrange(maskSize)]
-        for i in xrange(-viewRad, viewRad+1):
-            for j in xrange(-viewRad, viewRad+1):
-                if (i*i + j*j <= viewRad2):
-                    viewMask[viewRad+i][viewRad+j] = True
 
-        self.viewMask = viewMask
-        ## Alternatively (immutable):
-        # self.viewMask = tuple(tuple((True if (viewRad-r)**2 + (viewRad-c)**2 <= viewRad2
-                                          # else False)
-                                     # for c in xrange(maskSize))
-                              # for r in xrange(maskSize))
+        # assign factories
+        self.players = {}  # used to put initial factories in bot.factories once they exist... a bit ugly
+        for f in factories:
+            self.gameMap[f[0]][f[1]].owner = f[2]
+            if(f[2] in self.players):
+                self.players[f[2]].append( (f[0],f[1]) )
+            else:
+                self.players[f[2]] = [(f[0],f[1])]
+        self.replay['map'] = [[t.json() for t in x] for x in self.gameMap]
+
+        # pad map with false Tile to avoid most inbounds checking
+        # (only need outside since python wraps negative indicies)
+        self.mapX = len(self.gameMap)
+        self.mapY = len(self.gameMap[0])
+        falseTile = Tile(False, False, False)
+        for c in self.gameMap:
+            c.append(falseTile)
+        self.gameMap.append([falseTile] * (self.mapY + 1))
+
+        self.viewMasks = computeViewMasks(self.viewRad)
         self.turnNo = 0
 
     def run(self, botFiles):
@@ -75,7 +76,7 @@ class Terraform(object):
             self.bots[i+1] = Bot(i+1, f, self.players[i+1])
             self.bots[i+1].start(self.initPower)
 
-        while self.turnNo < self.maxTurns and len([b for b in self.bots if b.alive]) > 1:
+        while self.turnNo < self.maxTurns and len([b for b in self.bots.values() if b.alive]) > 1:
             print "Turn", self.turnNo
             self.replay['turns'].append([])
             self.propagateNano()
@@ -87,7 +88,6 @@ class Terraform(object):
                     for (x,y), t in self.getBotView(b).items():
                         # make all bots see themselves as player 1
                         apparentOwner = ((t.owner - b.id) % len(self.players)) + 1 if t.owner else 0
-                        #print "%d %d %s %d %s\n" % (x, y, t.terrain, apparentOwner, t.spreadTo or 0) ## DEBUG
                         b.stdin.write( "%d %d %s %d %s\n" % (x, y, t.terrain, apparentOwner, t.spreadTo or 0) )
                     b.stdin.write("go\n")
                     b.stdin.flush()
@@ -124,10 +124,12 @@ class Terraform(object):
                     raise GameError("outside of map.")
 
                 adjacentFactory = False
-                for i in xrange(-1, 2):
-                    for j in xrange(-1, 2):
-                        if (self.inBounds(x+i,y+j) and (x+i,y+j) in bot.factories):
-                            adjacentFactory = True
+                for dx,dy in Terraform.DIRS:
+                    if (x+dx,y+dy) in bot.factories:
+                        adjacentFactory = True
+                        break;
+                if (x,y) in bot.factories:
+                    adjacentFactory = True
                 if not adjacentFactory:
                     raise GameError("no adjacent factory.")
 
@@ -154,17 +156,14 @@ class Terraform(object):
     def propagateNano(self):
         q = self.nanoQueue
         self.nanoQueue = OrderedDict()
-        print q ## DEBUG
         for (nx,ny) in q:
             nt = self.gameMap[nx][ny]
-            for i in xrange(-1, 2):
-                x = nx + i
-                for j in xrange(-1, 2):
-                    y = ny + j
-                    if(self.inBounds(x,y) and self.gameMap[x][y].terrain == nt.spreadTo):
-                        self.setTile(x,y,nt.copy())
-                        self.nanoQueue.pop((x,y), None)
-                        self.nanoQueue[(x,y)] = True
+            for dx,dy in Terraform.DIRS:
+                x = nx + dx; y = ny + dy
+                if(self.gameMap[x][y].terrain == nt.spreadTo):
+                    self.setTile(x,y,nt.copy())
+                    self.nanoQueue.pop((x,y), None)
+                    self.nanoQueue[(x,y)] = True
             #remove old nano
             nt.spreadTo = None
             self.replay['turns'][-1].append({'x': nx, 'y': ny, 't': nt.json()})
@@ -179,20 +178,23 @@ class Terraform(object):
         self.replay['turns'][-1].append({'x': x, 'y': y, 't': tile.json()})
 
     def inBounds(self, x,y):
-        return 0 <= x and x < len(self.gameMap) and 0 <= y and y < len(self.gameMap[0])
+        return 0 <= x < self.mapX and 0 <= y < self.mapY
 
     #assuming non wrapping map
     def getBotView(self, b):
+        gameMap = self.gameMap
+        viewMasks = self.viewMasks
         view = {}
         for (xt,yt) in b.ownedTiles():
-            for i,x in enumerate(xrange(xt-self.viewRad, xt+self.viewRad+1)):
-                if not self.inBounds(x,0):
-                    continue
-                for j,y in enumerate(xrange(yt-self.viewRad, yt+self.viewRad+1)):
-                    if not self.inBounds(0,y):
-                        continue
-                    if self.viewMask[i][j]:
-                        view[(x,y)] = self.gameMap[x][y]
+            adj = [0,0,0,0,0,0,0,0]
+            for i, (dx, dy) in enumerate(Terraform.DIRS):
+                if gameMap[xt+dx][yt+dy].owner == b.id:
+                    adj[i] = 1
+            for dx,dy in viewMasks[tuple(adj)]:
+                x = xt + dx; y = yt + dy
+                if self.inBounds(x,y):
+                    view[(x,y)] = gameMap[x][y]
+
         return view
 
     def rmDead(self):
@@ -207,6 +209,55 @@ class Terraform(object):
         base = conversions[base] if base in conversions else int(base)
         result = conversions[result] if result in conversions else int(result)
         return self.nanoCosts[base][result] * (1 if spreading else self.stableFactor)
+
+
+def computeViewMasks(rad):
+    adjs = [[]]
+    for i in xrange(0,8):
+        tmp = []
+        for a in adjs:
+            tmp.append(a+[0])
+            tmp.append(a+[1])
+        adjs = tmp
+    return dict((tuple(a), computeMask(a, rad)) for a in adjs)
+
+# this is not very efficient, it needlessly recomputes the segments each time
+def computeMask(a, rad):
+    # east counterclockwise adjacency
+    # east-north counterclockwise segments
+    rad2 = rad*rad
+    segs = ( lambda i,j: (i,-j),
+             lambda i,j: (-j,i),
+             lambda i,j: (-j,-i),
+             lambda i,j: (-i,-j),
+             lambda i,j: (-i,j),
+             lambda i,j: (j,-i),
+             lambda i,j: (j,i),
+             lambda i,j: (i,j) )
+    # exclude the half-plane centered on directions with an adjacent
+    # owned tile
+    viewsegs = [ segs[i] for i in xrange(0,8)
+                 if not (a[i-1] or a[i] or a[(i+1) % 8] or a[(i+2) % 8]) ]
+    # exclude segment borders (+ and x) if strictly inside excluded
+    # half-plane
+    crossd = [ segs[i] for i in xrange(0,8,2)
+                if not (a[i-1] or a[i] or a[i+1 % 8]) ]
+    xd = [ segs[i] for i in xrange(-1,7,2)
+            if not (a[i-1] or a[i] or a[i+1 % 8]) ]
+
+    mask = [(0,0)]
+    for i in xrange(1,rad+1):
+        for d in crossd:
+            mask.append( d(i,0) )
+        if 2*i*i <= rad2:
+            for d in xd:
+                mask.append( d(i,i) )
+
+        for j in xrange(1,i):
+            if i*i + j*j <= rad2:
+                for s in viewsegs:
+                    mask.append( s(i,j) )
+    return mask
 
 
 class Tile(object):
