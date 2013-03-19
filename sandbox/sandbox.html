@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head>
+    <title>Terraform Sandbox</title>
+    <script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
+</head>
+<body>
+<div style="overflow:scroll;height:600px;width:900px;float:left;">
+    <canvas id="canvas"></canvas>
+</div>
+<div style="width:200px;float:left">
+    <h4 id="botnum"></h4>
+    <input type="button" id="stepbtn" value="Step" /><br />
+    <input type="button" id="runbtn" value="Run" /><br />
+    <input type="button" id="stopbtn" value="Stop" /><br />
+    <input type="button" id="reset" value="Reset" /><br />
+    <br />
+    <input type="button" id="genmap" value="Gen map" onclick="genMap()" /><br />
+    <label for="mapw">W:</label> <input type="text" id="mapw" size="5" value="50" /><br />
+    <label for="maph">H:</label> <input type="text" id="maph" size="5" value="50" /><br />
+    <label for="mapn">nTypes:</label> <input type="text" id="mapn" size="2" value="5" /><br />
+    <br />
+    <div id="tileinfo">
+        Selected tile:<br />
+        x: <input type="textbox" id="tilex" size="5" value="" /><br />
+        y: <input type="textbox" id="tiley" size="5" value="" /><br />
+        type: <input type="textbox" id="tiletype" size="2" value="" /><br />
+        nano: <input type="textbox" id="tilenano" size="2" value="" /><br />
+        owner: <input type="textbox" id="tileowner" size="2" value="" /><br />
+        <input type="button" id="settile" value="Set tile data" onclick="setTileInfo()" /><br />
+        <br />
+        New nano:<br />
+        (selected tile)<br />
+        <label for="newnanotype">resType:</label> <input type="text" id="newnanotype" size="2" /><br />
+        <label for="newnanospread">spread:</label> <input type="checkbox" id="newnanospread" checked /><br />
+        <input type="button" id="placenano" value="Place nano" />
+        <br />
+        <div id="colormap"></div>
+    </div>
+</div>
+<script type="text/javascript">
+var mapw = 50, maph = 50, mapn = 5;
+var map;
+var mapclrs; // 1, ..., n, "f", "c"
+function tileToClr(type){return mapclrs[(type == 'f' || type=='c') ? ((type == 'f') ? mapn : mapn+1) : type];}
+
+var turn = 1;
+var turnbot = 1; // which bot is moving?
+var bots = [{"id": 1, "power": 100}, {"id": 2, "power": 100}];
+
+// Canvas wrappers
+var ctx = $("#canvas")[0].getContext("2d");
+var tilew = 10, tileh = 10; // make sure these are even for best display
+function drawTile(x, y, clr, nanoResType)
+{
+    ctx.fillStyle=clr;
+    ctx.fillRect(tilew * x, tileh * y, tilew, tileh);
+    if (nanoResType != undefined)
+        drawNano(x, y, nanoResType);
+}
+function drawNano(x, y, resType)
+{
+    ctx.fillStyle=tileToClr(resType);
+    ctx.beginPath();
+    ctx.arc(tilew * x + Math.floor(tilew/2), tileh * y + Math.floor(tileh/2), Math.min(tilew, tileh)/2 - 2, 0, 6.2832, true);
+    ctx.closePath();
+    ctx.fill();
+}
+
+$("#canvas").click(function(e){
+    var rawx, rawy;
+    if (e.pageX != undefined && e.pageY != undefined) {rawx = e.pageX;rawy = e.pageY;}
+    else {
+        rawx = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+        rawy = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+    }
+    var x = Math.floor(rawx / tilew) - 1, y = Math.floor(rawy / tileh) - 1;
+    dispTileInfo(x<0?0:x, y<0?0:y);
+});
+
+// Game functions
+function setTile(x, y, tileType, tileOwner, tileNano)
+{
+    map[x][y] = {"t": tileType, "o": tileOwner, "s": tileNano};
+    drawTile(x, y, tileToClr(tileType), tileNano);
+}
+
+function dispTileInfo(x, y)
+{
+    $("#tilex").val(x);
+    $("#tiley").val(y);
+    $("#tiletype").val(map[x][y]["t"]);
+    $("#tilenano").val(map[x][y]["s"]);
+    $("#tileowner").val(map[x][y]["o"]);
+}
+
+function setTileInfo()
+{
+    setTile($("#tilex").val(), $("#tiley").val(), $("#tiletype").val(), $("#tileowner").val(), $("#tilenano").val());
+}
+
+function placeNano()
+{
+    
+}
+
+function genMap()
+{
+    mapw = $("#mapw").val();
+    maph = $("#maph").val();
+    mapn = $("#mapn").val();
+    
+    ctx.canvas.width = tilew * mapw;
+    ctx.canvas.height = tileh * maph;
+    $("#canvas").css({"width": tilew * mapw, "height": tileh * maph});
+    
+    mapclrs = new Array();
+    for (var i = 0; i < mapn + 2; i++)
+        mapclrs[i] = "#"+Math.floor(Math.random()*16777215).toString(16);
+    
+    map = new Array();
+    for (var x = 0; x < maph; x++)
+    {
+        map[x] = new Array();
+        for (var y = 0; y < mapw; y++)
+            setTile(x, y, Math.floor(Math.random() * mapn));
+    }
+    setTile(0, 0, "f", 1);
+    setTile(maph-1, mapw-1, "f", 2);
+}
+
+
+// initial setup
+$("#tilex, #tiley, #tiletype, #tilenano, #tileowner").val("");
+$("#mapw, #maph").val(50);
+$("#mapn").val(5);
+genMap();
+</script>
+</body>
+</html>
