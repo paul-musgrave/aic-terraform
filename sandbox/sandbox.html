@@ -6,11 +6,11 @@
 </head>
 <body>
 <div style="overflow:scroll;height:600px;width:900px;float:left;">
-    <canvas id="canvas"></canvas>
+    <canvas id="canvas" tabindex="1"></canvas>
 </div>
 <div style="width:220px;float:left">
     <h4 style="margin:0">Bot <span id="botnum"></span>'s Turn</h4>
-    <div>Power remaining: <span id="botpwr"></span></div><br />
+    <div>Power: <input type="textbox" id="botpwr" size="5" value="" /><input type="button" id="setpwr" value="Set" onclick="botpowers[turnbot]=$('#botpwr').val()" /></div><br />
     <div>Game control:</div>
     <input type="button" id="stepbtn" value="Step" /><input type="button" id="runbtn" value="Run" /><input type="button" id="stopbtn" value="Stop" /><input type="button" id="reset" value="Reset" /><br />
     <br />
@@ -28,14 +28,15 @@
         owner: <input type="textbox" id="tileowner" size="2" value="" /><br />
         <input type="button" id="settile" value="Set tile data" onclick="setTileInfo()" /><br />
         <br />
-        New nano:<br />
-        (selected tile)<br />
+        New nano (selected tile):<br />
+        (or press key of resType)<br />
         <label for="nanotype">resType:</label> <input type="text" id="nanotype" size="2" /><br />
         <label for="nanospread">spread:</label> <input type="checkbox" id="nanospread" checked /><br />
         <input type="button" id="placenano" value="Place nano" onclick="placeNano()" />
-        <br />
-        <div id="colormap"></div>
     </div>
+    <br />
+    <div>Click to edit:</div>
+    <div id="colormap"></div>
 </div>
 <script type="text/javascript">
 var mapw = 50, maph = 50, mapn = 5;
@@ -76,6 +77,12 @@ $("#canvas").click(function(e){
     var x = Math.floor(rawx / tilew) - 1, y = Math.floor(rawy / tileh) - 1;
     dispTileInfo(x<0?0:x, y<0?0:y);
 });
+$("#canvas").keypress(function(e){
+    var nanoType = String.fromCharCode(e.which);
+    if (nanoType != 'f' && nanoType != 'c' && (nanoType < '0' || nanoType > '9'))
+        return;
+    placeNano(nanoType);
+});
 
 // Game functions
 function setTile(x, y, tileType, tileOwner, tileNano)
@@ -98,20 +105,20 @@ function setTileInfo()
     setTile($("#tilex").val(), $("#tiley").val(), $("#tiletype").val(), $("#tileowner").val(), $("#tilenano").val());
 }
 
-function placeNano()
+function placeNano(nanoType)
 {
     if (botpowers[turnbot] < 10)
     {
         alert("Out of power!");
         return;
     }
-    setTile($("#tilex").val(), $("#tiley").val(), $("#tiletype").val(), turnbot, $("#nanotype").val());
+    setTile($("#tilex").val(), $("#tiley").val(), $("#tiletype").val(), turnbot, nanoType?nanoType:$("#nanotype").val());
     botpowers[turnbot] -= 10;
-    $("#botpwr").html(botpowers[turnbot]);
+    $("#botpwr").val(botpowers[turnbot]);
     dispTileInfo($("#tilex").val(), $("#tiley").val());
 }
 
-function genMap()
+function genMap(fixColors)
 {
     mapw = parseInt($("#mapw").val());
     maph = parseInt($("#maph").val());
@@ -120,14 +127,14 @@ function genMap()
     ctx.canvas.width = tilew * mapw;
     ctx.canvas.height = tileh * maph;
     $("#canvas").css({"width": tilew * mapw, "height": tileh * maph});
-    
+
     mapclrs = new Array();
     var clrmaphdr = '', clrmapcnt = '';
     for (var i = 0; i < mapn + 2; i++)
     {
         mapclrs[i] = '#' + Math.floor(1048576 + Math.random()*(16777215-1048576)).toString(16);
         clrmaphdr += '<th>' + ((i == mapn) ? 'f' : ((i == mapn+1) ? 'c' : i)) + '</th>';
-        clrmapcnt += '<td style="background-color:' + mapclrs[i] + ';width:16px">&nbsp;</td>';
+        clrmapcnt += '<td style="background-color:' + mapclrs[i] + ';width:16px" onclick="mapclrs[' + i + ']=prompt(\'Enter hex code with #\');this.style.backgroundColor=mapclrs[' + i + '];redrawMap()" >&nbsp;</td>';
     }
     $("#colormap").html('<table style="border:0;padding:1px;margin:0"><tr>' + clrmaphdr + '</tr><tr>' + clrmapcnt + '</tr></table>');
     
@@ -142,12 +149,19 @@ function genMap()
     setTile(maph-1, mapw-1, "f", 2);
 }
 
+function redrawMap()
+{
+    for (var x = 0; x < maph; x++)
+        for (var y = 0; y < mapw; y++)
+            setTile(x, y, map[x][y]["t"], map[x][y]["o"], map[x][y]["s"]);
+}
+
 // initial setup
 $("#tilex, #tiley, #tiletype, #tilenano, #tileowner").val("");
 $("#mapw, #maph").val(50);
 $("#mapn").val(5);
+$("#botpwr").val(botpowers[turnbot]);
 $("#botnum").html(turnbot);
-$("#botpwr").html(botpowers[turnbot]);
 genMap();
 </script>
 </body>
