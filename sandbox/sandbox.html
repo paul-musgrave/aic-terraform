@@ -8,17 +8,16 @@
 <div style="overflow:scroll;height:600px;width:900px;float:left;">
     <canvas id="canvas"></canvas>
 </div>
-<div style="width:200px;float:left">
-    <h4 id="botnum"></h4>
-    <input type="button" id="stepbtn" value="Step" /><br />
-    <input type="button" id="runbtn" value="Run" /><br />
-    <input type="button" id="stopbtn" value="Stop" /><br />
-    <input type="button" id="reset" value="Reset" /><br />
+<div style="width:220px;float:left">
+    <h4 style="margin:0">Bot <span id="botnum"></span>'s Turn</h4>
+    <div>Power remaining: <span id="botpwr"></span></div><br />
+    <div>Game control:</div>
+    <input type="button" id="stepbtn" value="Step" /><input type="button" id="runbtn" value="Run" /><input type="button" id="stopbtn" value="Stop" /><input type="button" id="reset" value="Reset" /><br />
     <br />
     <input type="button" id="genmap" value="Gen map" onclick="genMap()" /><br />
-    <label for="mapw">W:</label> <input type="text" id="mapw" size="5" value="50" /><br />
-    <label for="maph">H:</label> <input type="text" id="maph" size="5" value="50" /><br />
-    <label for="mapn">nTypes:</label> <input type="text" id="mapn" size="2" value="5" /><br />
+    <label for="mapw">W:</label> <input type="text" id="mapw" size="3" value="50" />
+    <label for="maph">H:</label> <input type="text" id="maph" size="3" value="50" />
+    <label for="mapn">n:</label> <input type="text" id="mapn" size="2" value="5" /><br />
     <br />
     <div id="tileinfo">
         Selected tile:<br />
@@ -31,9 +30,9 @@
         <br />
         New nano:<br />
         (selected tile)<br />
-        <label for="newnanotype">resType:</label> <input type="text" id="newnanotype" size="2" /><br />
-        <label for="newnanospread">spread:</label> <input type="checkbox" id="newnanospread" checked /><br />
-        <input type="button" id="placenano" value="Place nano" />
+        <label for="nanotype">resType:</label> <input type="text" id="nanotype" size="2" /><br />
+        <label for="nanospread">spread:</label> <input type="checkbox" id="nanospread" checked /><br />
+        <input type="button" id="placenano" value="Place nano" onclick="placeNano()" />
         <br />
         <div id="colormap"></div>
     </div>
@@ -45,8 +44,8 @@ var mapclrs; // 1, ..., n, "f", "c"
 function tileToClr(type){return mapclrs[(type == 'f' || type=='c') ? ((type == 'f') ? mapn : mapn+1) : type];}
 
 var turn = 1;
-var turnbot = 1; // which bot is moving?
-var bots = [{"id": 1, "power": 100}, {"id": 2, "power": 100}];
+var turnbot = 0; // which bot is moving?
+var botpowers = [100, 100];
 
 // Canvas wrappers
 var ctx = $("#canvas")[0].getContext("2d");
@@ -101,22 +100,36 @@ function setTileInfo()
 
 function placeNano()
 {
-    
+    if (botpowers[turnbot] < 10)
+    {
+        alert("Out of power!");
+        return;
+    }
+    setTile($("#tilex").val(), $("#tiley").val(), $("#tiletype").val(), turnbot, $("#nanotype").val());
+    botpowers[turnbot] -= 10;
+    $("#botpwr").html(botpowers[turnbot]);
+    dispTileInfo($("#tilex").val(), $("#tiley").val());
 }
 
 function genMap()
 {
-    mapw = $("#mapw").val();
-    maph = $("#maph").val();
-    mapn = $("#mapn").val();
+    mapw = parseInt($("#mapw").val());
+    maph = parseInt($("#maph").val());
+    mapn = parseInt($("#mapn").val());
     
     ctx.canvas.width = tilew * mapw;
     ctx.canvas.height = tileh * maph;
     $("#canvas").css({"width": tilew * mapw, "height": tileh * maph});
     
     mapclrs = new Array();
+    var clrmaphdr = '', clrmapcnt = '';
     for (var i = 0; i < mapn + 2; i++)
-        mapclrs[i] = "#"+Math.floor(Math.random()*16777215).toString(16);
+    {
+        mapclrs[i] = '#' + Math.floor(1048576 + Math.random()*(16777215-1048576)).toString(16);
+        clrmaphdr += '<th>' + ((i == mapn) ? 'f' : ((i == mapn+1) ? 'c' : i)) + '</th>';
+        clrmapcnt += '<td style="background-color:' + mapclrs[i] + ';width:16px">&nbsp;</td>';
+    }
+    $("#colormap").html('<table style="border:0;padding:1px;margin:0"><tr>' + clrmaphdr + '</tr><tr>' + clrmapcnt + '</tr></table>');
     
     map = new Array();
     for (var x = 0; x < maph; x++)
@@ -129,11 +142,12 @@ function genMap()
     setTile(maph-1, mapw-1, "f", 2);
 }
 
-
 // initial setup
 $("#tilex, #tiley, #tiletype, #tilenano, #tileowner").val("");
 $("#mapw, #maph").val(50);
 $("#mapn").val(5);
+$("#botnum").html(turnbot);
+$("#botpwr").html(botpowers[turnbot]);
 genMap();
 </script>
 </body>
