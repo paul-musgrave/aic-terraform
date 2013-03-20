@@ -35,7 +35,7 @@ random.seed()
 # random generator
 def genRndMap(outputFile):
     # generate w * h 2d list of random map data (including only terrain type)
-    mapData = [[random.randint(1, terrainTypes) for y in xrange(args.h)] for x in xrange(args.w)]
+    mapData = [[random.randint(0, terrainTypes-1) for y in xrange(args.h)] for x in xrange(args.w)]
 
     # place initial factories at random locations
     mapData[0][0] = mapData[args.w - 1][args.h - 1] = 'f'
@@ -54,7 +54,7 @@ def genRndMap(outputFile):
 # write metadata
 with open('-'.join([str(args.t), str(args.w), str(args.h), str(terrainTypes)]) + '.map', 'w') as outputFile:
     outputFile.write('plain\n')
-    outputFile.write(' '.join([str(terrainTypes), str(initPower), str(maxTurns), str(viewRad)]) + '\n')
+    outputFile.write(' '.join([str(args.w), str(args.h), str(terrainTypes), str(initPower), str(maxTurns), str(viewRad)]) + '\n')
 
     for row in nanoCosts:
         for entry in row:

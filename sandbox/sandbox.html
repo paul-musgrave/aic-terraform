@@ -11,13 +11,13 @@
 <div style="width:220px;float:left">
     <h4 style="margin:0">Bot <span id="botnum"></span>'s Turn</h4>
     <div>Power: <input type="textbox" id="botpwr" size="5" value="" /><input type="button" id="setpwr" value="Set" onclick="botpowers[turnbot]=$('#botpwr').val()" /></div><br />
-    <div>Game control:</div>
     <input type="button" id="stepbtn" value="Step" /><input type="button" id="runbtn" value="Run" /><input type="button" id="stopbtn" value="Stop" /><input type="button" id="reset" value="Reset" /><br />
     <br />
-    <input type="button" id="genmap" value="Gen map" onclick="genMap()" /><br />
+    <input type="button" id="genmap" value="Gen map" onclick="genMap()" /><input type="button" value="Import" onclick="importMap()" /><br />
     <label for="mapw">W:</label> <input type="text" id="mapw" size="3" value="50" />
     <label for="maph">H:</label> <input type="text" id="maph" size="3" value="50" />
-    <label for="mapn">n:</label> <input type="text" id="mapn" size="2" value="5" /><br />
+    <label for="mapn">n:</label> <input type="text" id="mapn" size="1" value="5" /><br />
+    <input type="button" value="nanoCosts" onclick="doNanoCosts()" /><br />
     <br />
     <div id="tileinfo">
         Selected tile:<br />
@@ -29,7 +29,7 @@
         <input type="button" id="settile" value="Set tile data" onclick="setTileInfo()" /><br />
         <br />
         New nano (selected tile):<br />
-        (or press key of resType)<br />
+        (or press key of resType on tile)<br />
         <label for="nanotype">resType:</label> <input type="text" id="nanotype" size="2" /><br />
         <label for="nanospread">spread:</label> <input type="checkbox" id="nanospread" checked /><br />
         <input type="button" id="placenano" value="Place nano" onclick="placeNano()" />
@@ -41,12 +41,17 @@
 <script type="text/javascript">
 var mapw = 50, maph = 50, mapn = 5;
 var map;
+var numSpecialTypes = 2;
+var totalTypes = mapn + numSpecialTypes; // there are two special tiles!
 var mapclrs; // 1, ..., n, "f", "c"
-function tileToClr(type){return mapclrs[(type == 'f' || type=='c') ? ((type == 'f') ? mapn : mapn+1) : type];}
+function typeToInd(type){return (type=='f' || type=='c') ? ((type=='f')?mapn:mapn+1) : type;}
+function typeToClr(type){return mapclrs[typeToInd(type)];}
 
 var turn = 1;
 var turnbot = 0; // which bot is moving?
 var botpowers = [100, 100];
+var nanoCosts;
+var stableFactor = 1;
 
 // Canvas wrappers
 var ctx = $("#canvas")[0].getContext("2d");
@@ -60,7 +65,7 @@ function drawTile(x, y, clr, nanoResType)
 }
 function drawNano(x, y, resType)
 {
-    ctx.fillStyle=tileToClr(resType);
+    ctx.fillStyle=typeToClr(resType);
     ctx.beginPath();
     ctx.arc(tilew * x + Math.floor(tilew/2), tileh * y + Math.floor(tileh/2), Math.min(tilew, tileh)/2 - 2, 0, 6.2832, true);
     ctx.closePath();
@@ -88,7 +93,7 @@ $("#canvas").keypress(function(e){
 function setTile(x, y, tileType, tileOwner, tileNano)
 {
     map[x][y] = {"t": tileType, "o": tileOwner, "s": tileNano};
-    drawTile(x, y, tileToClr(tileType), tileNano);
+    drawTile(x, y, typeToClr(tileType), tileNano);
 }
 
 function dispTileInfo(x, y)
@@ -105,6 +110,20 @@ function setTileInfo()
     setTile($("#tilex").val(), $("#tiley").val(), $("#tiletype").val(), $("#tileowner").val(), $("#tilenano").val());
 }
 
+function doNanoCosts()
+{
+    var str = '';
+    for (var i = 0; i < totalTypes; i++)
+        str += nanoCosts[i].join(', ') + '\n';
+    alert(str);
+    str = prompt("Enter new nanoCosts matrix (row major, comma delimited, M_ij transforms i to j):");
+    if (str == null) return;
+    var rowmajorCosts = str.split(",");
+    for (var i = 0; i < totalTypes; i++)
+        for (var j = 0; j < totalTypes; j++)
+            nanoCosts[i][j] = parseInt(rowmajorCosts[totalTypes*i + j]);
+}
+
 function placeNano(nanoType)
 {
     if (botpowers[turnbot] < 10)
@@ -113,9 +132,23 @@ function placeNano(nanoType)
         return;
     }
     setTile($("#tilex").val(), $("#tiley").val(), $("#tiletype").val(), turnbot, nanoType?nanoType:$("#nanotype").val());
-    botpowers[turnbot] -= 10;
+    botpowers[turnbot] -= nanoCosts[typeToInd($("#tiletype").val())][typeToInd(nanoType)];
     $("#botpwr").val(botpowers[turnbot]);
     dispTileInfo($("#tilex").val(), $("#tiley").val());
+}
+
+function makeColorful()
+{
+    // generate map color scheme
+    mapclrs = new Array();
+    var clrmaphdr = '', clrmapcnt = '';
+    for (var i = 0; i < totalTypes; i++)
+    {
+        mapclrs[i] = '#' + Math.floor(1048576 + Math.random()*(16777215-1048576)).toString(16);
+        clrmaphdr += '<th>' + ((i == mapn) ? 'f' : ((i == mapn+1) ? 'c' : i)) + '</th>';
+        clrmapcnt += '<td style="background-color:' + mapclrs[i] + ';width:16px" onclick="var r=prompt(\'Enter hex code with #\');if(r==null)return;mapclrs[' + i + ']=r;this.style.backgroundColor=mapclrs[' + i + '];redrawMap()" >&nbsp;</td>';
+    }
+    $("#colormap").html('<table style="border:0;padding:1px;margin:0"><tr>' + clrmaphdr + '</tr><tr>' + clrmapcnt + '</tr></table>');
 }
 
 function genMap(fixColors)
@@ -123,26 +156,30 @@ function genMap(fixColors)
     mapw = parseInt($("#mapw").val());
     maph = parseInt($("#maph").val());
     mapn = parseInt($("#mapn").val());
+    totalTypes = mapn + numSpecialTypes;
     
     ctx.canvas.width = tilew * mapw;
     ctx.canvas.height = tileh * maph;
     $("#canvas").css({"width": tilew * mapw, "height": tileh * maph});
 
-    mapclrs = new Array();
-    var clrmaphdr = '', clrmapcnt = '';
-    for (var i = 0; i < mapn + 2; i++)
+    // generate constant nano cost matrix (M_ij = 10)
+    nanoCosts = new Array();
+    for (var i = 0; i < totalTypes; i++)
     {
-        mapclrs[i] = '#' + Math.floor(1048576 + Math.random()*(16777215-1048576)).toString(16);
-        clrmaphdr += '<th>' + ((i == mapn) ? 'f' : ((i == mapn+1) ? 'c' : i)) + '</th>';
-        clrmapcnt += '<td style="background-color:' + mapclrs[i] + ';width:16px" onclick="mapclrs[' + i + ']=prompt(\'Enter hex code with #\');this.style.backgroundColor=mapclrs[' + i + '];redrawMap()" >&nbsp;</td>';
+        nanoCosts[i] = new Array();
+        for (var j = 0; j < totalTypes; j++)
+            nanoCosts[i][j] = 10;
     }
-    $("#colormap").html('<table style="border:0;padding:1px;margin:0"><tr>' + clrmaphdr + '</tr><tr>' + clrmapcnt + '</tr></table>');
     
+    // rraaaiiinnnboooooww!
+    makeColorful();
+    
+    // generate random map
     map = new Array();
-    for (var x = 0; x < maph; x++)
+    for (var x = 0; x < mapw; x++)
     {
         map[x] = new Array();
-        for (var y = 0; y < mapw; y++)
+        for (var y = 0; y < maph; y++)
             setTile(x, y, Math.floor(Math.random() * mapn));
     }
     setTile(0, 0, "f", 1);
@@ -151,9 +188,60 @@ function genMap(fixColors)
 
 function redrawMap()
 {
-    for (var x = 0; x < maph; x++)
-        for (var y = 0; y < mapw; y++)
+    for (var x = 0; x < mapw; x++)
+        for (var y = 0; y < maph; y++)
             setTile(x, y, map[x][y]["t"], map[x][y]["o"], map[x][y]["s"]);
+}
+
+function importMap()
+{
+    var rawmap = prompt("Copy and paste map from map file (do not add/remove formatting):");
+    if (rawmap == null) return;
+    
+    rawmap = rawmap.replace(/ +(?= )/g,'').split(' ');
+    if (rawmap.shift() != 'plain')
+    {
+        alert("Unknown map format (first line is not 'plain')!");
+        return;
+    }
+    mapw = parseInt(rawmap.shift()); maph = parseInt(rawmap.shift()); mapn = parseInt(rawmap.shift());
+    $("#mapw").val(mapw);
+    $("#maph").val(maph);
+    $("#mapn").val(mapn);
+    ctx.canvas.width = tilew * mapw;
+    ctx.canvas.height = tileh * maph;
+    $("#canvas").css({"width": tilew * mapw, "height": tileh * maph});
+    totaltypes = mapn + numSpecialTypes;
+    
+    botpowers[0] = botpowers[1] = parseInt(rawmap.shift());
+    $("#botpwr").val(botpowers[turnbot]);
+
+    var maxTurns = parseInt(rawmap.shift()), viewRad = parseInt(rawmap.shift());
+    
+    // okay, now the nanoCosts matrix
+    for (var i = 0; i < totalTypes; i++)
+        for (var j = 0; j < totalTypes; j++)
+            nanoCosts[i][j] = rawmap.shift();
+    
+    stableFactor = rawmap.shift();
+    var numFactories = rawmap.shift(), factories = new Array();
+    for (var i = 0; i < numFactories; i++)
+        factories[i] = {"x": rawmap.shift(), "y": rawmap.shift(), "o": rawmap.shift()};
+    
+    // new color scheme is mandatory
+    makeColorful();
+    
+    // finally, now the map itself!
+    map = new Array();
+    for (var x = 0; x < mapw; x++)
+    {
+        var rawmaprow = rawmap.shift().split('');
+        map[x] = new Array();
+        for (var y = 0; y < maph; y++)
+            setTile(x, y, rawmaprow[y]);
+    }
+    for (var i = 0; i < factories.length; i++)
+        setTile(factories[i]["x"], factories[i]["y"], map[factories[i]["x"]][factories[i]["y"]]["t"], factories[i]["o"]);
 }
 
 // initial setup
