@@ -5,13 +5,13 @@
     <script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
 </head>
 <body>
-<div style="overflow:scroll;height:600px;width:900px;float:left;">
+<div id="canvasWrap" style="overflow:scroll;height:600px;width:900px;float:left;">
     <canvas id="canvas" tabindex="1"></canvas>
 </div>
 <div style="width:220px;float:left">
-    <h4 style="margin:0">Bot <span id="botnum"></span>'s Turn</h4>
-    <div>Power: <input type="textbox" id="botpwr" size="5" value="" /><input type="button" id="setpwr" value="Set" onclick="botpowers[turnbot]=$('#botpwr').val()" /></div><br />
-    <input type="button" id="stepbtn" value="Step" /><input type="button" id="runbtn" value="Run" /><input type="button" id="stopbtn" value="Stop" /><input type="button" id="reset" value="Reset" /><br />
+    <h4 style="margin:0">Bot <span id="botnum"></span>, Turn #<span id="turnnum"></span></h4>
+    <div>Power: <input type="textbox" id="botpwr" size="5" value="" /><input type="button" id="setpwr" value="Set" onclick="bots[curbot]['p']=$('#botpwr').val()" /></div><br />
+    <input type="button" id="stepbtn" value="Next Turn" onclick="gameTurn()" /><input type="button" id="newbtn" value="New Game" onclick="genMap()" /><br />
     <br />
     <input type="button" id="genmap" value="Gen map" onclick="genMap()" /><input type="button" value="Import" onclick="importMap()" /><br />
     <label for="mapw">W:</label> <input type="text" id="mapw" size="3" value="50" />
@@ -29,7 +29,7 @@
         <input type="button" id="settile" value="Set tile data" onclick="setTileInfo()" /><br />
         <br />
         New nano (selected tile):<br />
-        (or press key of resType on tile)<br />
+        (or press key on tile)<br />
         <label for="nanotype">resType:</label> <input type="text" id="nanotype" size="2" /><br />
         <label for="nanospread">spread:</label> <input type="checkbox" id="nanospread" checked /><br />
         <input type="button" id="placenano" value="Place nano" onclick="placeNano()" />
@@ -46,12 +46,16 @@ var totalTypes = mapn + numSpecialTypes; // there are two special tiles!
 var mapclrs; // 1, ..., n, "f", "c"
 function typeToInd(type){return (type=='f' || type=='c') ? ((type=='f')?mapn:mapn+1) : type;}
 function typeToClr(type){return mapclrs[typeToInd(type)];}
+var dirs = [[1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1]]; //ccw@east
 
 var turn = 1;
-var turnbot = 0; // which bot is moving?
-var botpowers = [100, 100];
+var curbot = 0; // which bot is moving?
+// p = power, c = list of collectors, fs = list of factories, alive = is bot alive
+var bots = [{"p": 100, "cs": [], "fs": [], "alive": false}, {"p": 100, "cs": [], "fs": [], "alive": false}]; 
 var nanoCosts;
 var stableFactor = 1;
+var nanoQueue;
+var isGameOver = true;
 
 // Canvas wrappers
 var ctx = $("#canvas")[0].getContext("2d");
@@ -74,10 +78,13 @@ function drawNano(x, y, resType)
 
 $("#canvas").click(function(e){
     var rawx, rawy;
-    if (e.pageX != undefined && e.pageY != undefined) {rawx = e.pageX;rawy = e.pageY;}
+    if (e.pageX != undefined && e.pageY != undefined) {
+        rawx = e.pageX + $("#canvasWrap").scrollLeft();
+        rawy = e.pageY + $("#canvasWrap").scrollTop();
+    }
     else {
-        rawx = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-        rawy = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+        rawx = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft + $("#canvasWrap").scrollLeft();
+        rawy = e.clientY + document.body.scrollTop + document.documentElement.scrollTop + $("#canvasWrap").scrollTop();
     }
     var x = Math.floor(rawx / tilew) - 1, y = Math.floor(rawy / tileh) - 1;
     dispTileInfo(x<0?0:x, y<0?0:y);
@@ -94,6 +101,11 @@ function setTile(x, y, tileType, tileOwner, tileNano)
 {
     map[x][y] = {"t": tileType, "o": tileOwner, "s": tileNano};
     drawTile(x, y, typeToClr(tileType), tileNano);
+    
+    if (tileType == 'f' && tileOwner != null && $.inArray([x, y], bots[tileOwner]["fs"]) == -1)
+        bots[tileOwner]["fs"].push([x, y]);
+    if (tileType == 'c' && tileOwner != null && $.inArray([x, y], bots[tileOwner]["cs"]) == -1)
+        bots[tileOwner]["cs"].push([x, y]);
 }
 
 function dispTileInfo(x, y)
@@ -126,15 +138,33 @@ function doNanoCosts()
 
 function placeNano(nanoType)
 {
-    if (botpowers[turnbot] < 10)
+    var necessaryPower = nanoCosts[typeToInd($("#tiletype").val())][typeToInd(nanoType)];
+    if (bots[curbot]["p"] < necessaryPower)
     {
         alert("Out of power!");
         return;
     }
-    setTile($("#tilex").val(), $("#tiley").val(), $("#tiletype").val(), turnbot, nanoType?nanoType:$("#nanotype").val());
-    botpowers[turnbot] -= nanoCosts[typeToInd($("#tiletype").val())][typeToInd(nanoType)];
-    $("#botpwr").val(botpowers[turnbot]);
+    var x = parseInt($("#tilex").val()), y = parseInt($("#tiley").val());
+    var adjacentFactory = false;
+    for (var i = 0; i < dirs.length; i++)
+    {
+        var nx = x+dirs[i][0], ny = y+dirs[i][1];
+        if (nx >= mapw || ny >= maph || nx < 0 || ny < 0)
+            continue;
+        if (map[nx][ny]["t"] == 'f' && map[nx][ny]["o"] == curbot)
+            adjacentFactory = true;
+    }
+    if (!adjacentFactory)
+    {
+        alert("Factories can only construct nanos adjacently");
+        return;
+    }
+    setTile(x, y, $("#tiletype").val(), curbot, nanoType?nanoType:$("#nanotype").val());
+    bots[curbot]["p"] -= necessaryPower;
+    $("#botpwr").val(bots[curbot]["p"]);
     dispTileInfo($("#tilex").val(), $("#tiley").val());
+    
+    nanoQueue.push({"x": x, "y": y});
 }
 
 function makeColorful()
@@ -182,8 +212,10 @@ function genMap(fixColors)
         for (var y = 0; y < maph; y++)
             setTile(x, y, Math.floor(Math.random() * mapn));
     }
-    setTile(0, 0, "f", 1);
-    setTile(maph-1, mapw-1, "f", 2);
+    setTile(0, 0, "f", 0);
+    setTile(mapw-1, maph-1, "f", 1);
+    
+    initGame();
 }
 
 function redrawMap()
@@ -213,8 +245,9 @@ function importMap()
     $("#canvas").css({"width": tilew * mapw, "height": tileh * maph});
     totaltypes = mapn + numSpecialTypes;
     
-    botpowers[0] = botpowers[1] = parseInt(rawmap.shift());
-    $("#botpwr").val(botpowers[turnbot]);
+    for (var i = 0; i < bots.length; i++)
+        bots[i]["p"] = parseInt(rawmap.shift());
+    $("#botpwr").val(bots[curbot]["p"]);
 
     var maxTurns = parseInt(rawmap.shift()), viewRad = parseInt(rawmap.shift());
     
@@ -242,14 +275,109 @@ function importMap()
     }
     for (var i = 0; i < factories.length; i++)
         setTile(factories[i]["x"], factories[i]["y"], map[factories[i]["x"]][factories[i]["y"]]["t"], factories[i]["o"]);
+        
+    initGame();
 }
 
-// initial setup
-$("#tilex, #tiley, #tiletype, #tilenano, #tileowner").val("");
-$("#mapw, #maph").val(50);
-$("#mapn").val(5);
-$("#botpwr").val(botpowers[turnbot]);
-$("#botnum").html(turnbot);
+function initGame()
+{
+    turn = 1;
+    curbot = 0;
+    nanoQueue = new Array();
+    
+    $("#tilex, #tiley, #tiletype, #tilenano, #tileowner").val("");
+    $("#mapw").val(mapw);
+    $("#maph").val(maph);
+    $("#mapn").val(mapn);
+    $("#botpwr").val(bots[curbot]["p"]);
+    $("#botnum").html(curbot);
+    $("#turnnum").html(turn);
+    
+    for (var i = 0; i < bots.length; i++)
+        bots[i]["alive"] = true;
+        
+    $("#stepbtn").removeAttr("disabled");
+    isGameOver = false;
+}
+
+function propagateNano()
+{
+    var q = nanoQueue;
+    nanoQueue = [];
+    for (var i = 0; i < q.length; i++)
+    {
+        var nx = q[i]["x"];
+        var ny = q[i]["y"];
+        setTile(nx, ny, map[nx][ny]["s"], map[nx][ny]["o"], map[nx][ny]["t"]); // hacky but hopefully works?
+    }
+    
+    for (var i = 0; i < q.length; i++)
+    {
+        var nx = q[i]["x"];
+        var ny = q[i]["y"];
+        for (var d = 0; d < dirs.length; d++)
+        {
+            var x = nx + dirs[d][0];
+            var y = ny + dirs[d][1];
+            if (x >= mapw || y >= maph || x < 0 || y < 0)
+                continue;
+            if (map[x][y]["t"] == map[nx][ny]["s"])
+            {
+                setTile(x, y, map[x][y]["t"], map[nx][ny]["o"], map[nx][ny]["t"]);
+                nanoQueue = $.grep(nanoQueue, function(elt, ind){return !(elt["x"] == x && elt["y"] == y);}); //inefficient
+                nanoQueue.push({"x": x, "y": y});
+            }
+        }
+        setTile(nx, ny, map[nx][ny]["t"], map[nx][ny]["o"]); // remove nano from prev tile
+    }
+}
+
+function removeDead()
+{
+    var alivebots = [];
+    for (var i = 0; i < bots.length; i++)
+    {
+        if (bots[i]["fs"].length == 0 && bots[i]["alive"])
+        {
+            alert("Bot " + i + " died!");
+            bots[i] = {"p": 0, "cs": [], "fs": [], "alive": false};
+        }
+        else if (bots[i]["alive"])
+            alivebots.push(i);
+    }
+    if (alivebots.length == 1)
+    {
+        alert("Game over! Bot " + alivebots[0] + " wins!");
+        $("#stepbtn").attr("disabled", "disabled");
+        isGameOver = true;
+        return;
+    }
+}
+
+function gameTurn()
+{
+    removeDead();
+    if (isGameOver) return;
+    
+    // next bot!
+    curbot = (curbot + 1) % bots.length;
+    $("#botnum").html(curbot);
+    
+    // when a full turn is over...
+    if (curbot == 0)
+    {
+        turn++;
+        $("#turnnum").html(turn);
+        propagateNano();
+        removeDead();
+        if (isGameOver) return;
+    }
+    
+    // gen power
+    bots[curbot]["p"] += 10 + 3 * Math.log(bots[curbot]["cs"].length + 1) / Math.log(2);
+}
+
+// Go!
 genMap();
 </script>
 </body>
