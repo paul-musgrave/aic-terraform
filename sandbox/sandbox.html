@@ -99,13 +99,22 @@ $("#canvas").keypress(function(e){
 // Game functions
 function setTile(x, y, tileType, tileOwner, tileNano)
 {
+    var curOwner = parseInt(map[x][y]?map[x][y]["o"]:null);
+    if (curOwner >= 0)
+    {
+        if (map[x][y]["t"] == 'f')
+            delete bots[curOwner]["fs"][x + "," + y];
+        else if (map[x][y]["t"] == 'c')
+            delete bots[curOwner]["fs"][x + "," + y];
+    }
+
     map[x][y] = {"t": tileType, "o": tileOwner, "s": tileNano};
     drawTile(x, y, typeToClr(tileType), tileNano);
-    
-    if (tileType == 'f' && tileOwner != null && $.inArray([x, y], bots[tileOwner]["fs"]) == -1)
-        bots[tileOwner]["fs"].push([x, y]);
-    if (tileType == 'c' && tileOwner != null && $.inArray([x, y], bots[tileOwner]["cs"]) == -1)
-        bots[tileOwner]["cs"].push([x, y]);
+
+    if (tileType == 'f' && tileOwner != null && $.inArray([x, y], bots[tileOwner]["fs"][x + "," + y]) != true)
+        bots[tileOwner]["fs"][x + "," + y] = true;
+    if (tileType == 'c' && tileOwner != null && $.inArray([x, y], bots[tileOwner]["cs"][x + "," + y]) != true)
+        bots[tileOwner]["cs"][x + "," + y] = true;
 }
 
 function dispTileInfo(x, y)
@@ -201,6 +210,10 @@ function genMap(fixColors)
             nanoCosts[i][j] = 10;
     }
     
+    // bot powers
+    for (var i = 0; i < bots.length; i++)
+        bots[i]["p"] = 100;
+    
     // rraaaiiinnnboooooww!
     makeColorful();
     
@@ -225,9 +238,10 @@ function redrawMap()
             setTile(x, y, map[x][y]["t"], map[x][y]["o"], map[x][y]["s"]);
 }
 
+var rawmap;
 function importMap()
 {
-    var rawmap = prompt("Copy and paste map from map file (do not add/remove formatting):");
+    rawmap = prompt("Copy and paste map from map file (do not add/remove formatting):");
     if (rawmap == null) return;
     
     rawmap = rawmap.replace(/ +(?= )/g,'').split(' ');
@@ -245,8 +259,9 @@ function importMap()
     $("#canvas").css({"width": tilew * mapw, "height": tileh * maph});
     totaltypes = mapn + numSpecialTypes;
     
+    var initpwr = parseInt(rawmap.shift());
     for (var i = 0; i < bots.length; i++)
-        bots[i]["p"] = parseInt(rawmap.shift());
+        bots[i]["p"] = initpwr;
     $("#botpwr").val(bots[curbot]["p"]);
 
     var maxTurns = parseInt(rawmap.shift()), viewRad = parseInt(rawmap.shift());
@@ -256,10 +271,10 @@ function importMap()
         for (var j = 0; j < totalTypes; j++)
             nanoCosts[i][j] = rawmap.shift();
     
-    stableFactor = rawmap.shift();
-    var numFactories = rawmap.shift(), factories = new Array();
+    stableFactor = parseFloat(rawmap.shift());
+    var numFactories = parseInt(rawmap.shift()), factories = new Array();
     for (var i = 0; i < numFactories; i++)
-        factories[i] = {"x": rawmap.shift(), "y": rawmap.shift(), "o": rawmap.shift()};
+        factories[i] = {"x": parseInt(rawmap.shift()), "y": parseInt(rawmap.shift()), "o": parseInt(rawmap.shift()) - 1};
     
     // new color scheme is mandatory
     makeColorful();
@@ -275,7 +290,7 @@ function importMap()
     }
     for (var i = 0; i < factories.length; i++)
         setTile(factories[i]["x"], factories[i]["y"], map[factories[i]["x"]][factories[i]["y"]]["t"], factories[i]["o"]);
-        
+
     initGame();
 }
 
@@ -337,6 +352,7 @@ function removeDead()
     var alivebots = [];
     for (var i = 0; i < bots.length; i++)
     {
+        // ## THIS CHECK IS GLITCHY BECAUSE OF ASSOCIATIVE ARRAY
         if (bots[i]["fs"].length == 0 && bots[i]["alive"])
         {
             alert("Bot " + i + " died!");
@@ -345,7 +361,7 @@ function removeDead()
         else if (bots[i]["alive"])
             alivebots.push(i);
     }
-    if (alivebots.length == 1)
+    if (alivebots.length <= 1)
     {
         alert("Game over! Bot " + alivebots[0] + " wins!");
         $("#stepbtn").attr("disabled", "disabled");
@@ -375,6 +391,7 @@ function gameTurn()
     
     // gen power
     bots[curbot]["p"] += 10 + 3 * Math.log(bots[curbot]["cs"].length + 1) / Math.log(2);
+    $("#botpwr").html(bots[curbot]["p"]);
 }
 
 // Go!
