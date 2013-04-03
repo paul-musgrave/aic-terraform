@@ -51,7 +51,7 @@ var dirs = [[1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1]
 var turn = 1;
 var curbot = 0; // which bot is moving?
 // p = power, c = list of collectors, fs = list of factories, alive = is bot alive
-var bots = [{"p": 100, "cs": [], "fs": [], "alive": false}, {"p": 100, "cs": [], "fs": [], "alive": false}]; 
+var bots = [{"p": 100, "cs": 0, "fs": 0, "alive": false}, {"p": 100, "cs": 0, "fs": 0, "alive": false}]; 
 var nanoCosts;
 var stableFactor = 1;
 var nanoQueue;
@@ -90,10 +90,15 @@ $("#canvas").click(function(e){
     dispTileInfo(x<0?0:x, y<0?0:y);
 });
 $("#canvas").keypress(function(e){
-    var nanoType = String.fromCharCode(e.which);
-    if (nanoType != 'f' && nanoType != 'c' && (nanoType < '0' || nanoType > '9'))
-        return;
-    placeNano(nanoType);
+    e = e || window.event;
+    if (e.keyCode == 39) // right arrow key
+        gameTurn();
+    else {
+        var nanoType = String.fromCharCode(e.which);
+        if (nanoType != 'f' && nanoType != 'c' && (nanoType < '0' || nanoType > '9'))
+            return;
+        placeNano(nanoType);
+    }
 });
 
 // Game functions
@@ -103,18 +108,30 @@ function setTile(x, y, tileType, tileOwner, tileNano)
     if (curOwner >= 0)
     {
         if (map[x][y]["t"] == 'f')
+        {
             delete bots[curOwner]["fs"][x + "," + y];
+            bots[curOwner]["fs"]--;
+        }
         else if (map[x][y]["t"] == 'c')
-            delete bots[curOwner]["fs"][x + "," + y];
+        {
+            delete bots[curOwner]["cs"][x + "," + y];
+            bots[curOwner]["cs"]--;
+        }
     }
 
     map[x][y] = {"t": tileType, "o": tileOwner, "s": tileNano};
     drawTile(x, y, typeToClr(tileType), tileNano);
 
     if (tileType == 'f' && tileOwner != null && $.inArray([x, y], bots[tileOwner]["fs"][x + "," + y]) != true)
+    {
         bots[tileOwner]["fs"][x + "," + y] = true;
+        bots[tileOwner]["fs"]++;
+    }
     if (tileType == 'c' && tileOwner != null && $.inArray([x, y], bots[tileOwner]["cs"][x + "," + y]) != true)
+    {
         bots[tileOwner]["cs"][x + "," + y] = true;
+        bots[tileOwner]["cs"]++;
+    }
 }
 
 function dispTileInfo(x, y)
@@ -261,7 +278,7 @@ function importMap()
     
     var initpwr = parseInt(rawmap.shift());
     for (var i = 0; i < bots.length; i++)
-        bots[i]["p"] = initpwr;
+        bots[i] = {"p": initpwr, "cs": 0, "fs": 0, "alive": false};
     $("#botpwr").val(bots[curbot]["p"]);
 
     var maxTurns = parseInt(rawmap.shift()), viewRad = parseInt(rawmap.shift());
@@ -353,10 +370,10 @@ function removeDead()
     for (var i = 0; i < bots.length; i++)
     {
         // ## THIS CHECK IS GLITCHY BECAUSE OF ASSOCIATIVE ARRAY
-        if (bots[i]["fs"].length == 0 && bots[i]["alive"])
+        if (bots[i]["fs"] == 0 && bots[i]["alive"])
         {
             alert("Bot " + i + " died!");
-            bots[i] = {"p": 0, "cs": [], "fs": [], "alive": false};
+            bots[i] = {"p": 0, "cs": 0, "fs": 0, "alive": false};
         }
         else if (bots[i]["alive"])
             alivebots.push(i);
@@ -390,8 +407,8 @@ function gameTurn()
     }
     
     // gen power
-    bots[curbot]["p"] += 10 + 3 * Math.log(bots[curbot]["cs"].length + 1) / Math.log(2);
-    $("#botpwr").html(bots[curbot]["p"]);
+    bots[curbot]["p"] += 10 + 3 * Math.log(bots[curbot]["cs"] + 1) / Math.log(2);
+    $("#botpwr").val(bots[curbot]["p"]);
 }
 
 // Go!
